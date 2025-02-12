@@ -45,6 +45,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Слушатель изменений в хранилище
     chrome.storage.onChanged.addListener(updateUI);
 });
