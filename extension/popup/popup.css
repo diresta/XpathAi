@@ -1,0 +1,39 @@
+body {
+    font-family: Arial, sans-serif;
+    width: 300px;
+    padding: 10px;
+}
+
+button {
+    padding: 8px 12px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#status {
+    color: #666;
+    margin: 10px 0;
+}
+
+#xpathOutput {
+    width: 100%;
+    padding: 8px;
+    margin-top: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: monospace;
+    cursor: pointer;
+}
+
+#xpathOutput:focus {
+    outline: none;
+    border-color: #007bff;
+}
+
+.error {
+    color: #dc3545;
+    border-color: #dc3545;
+}
