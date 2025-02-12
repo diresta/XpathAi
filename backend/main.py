@@ -2,7 +2,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from lxml import html
+from lxml import html, etree
 from lxml.etree import XMLSyntaxError
 import logging
 
@@ -33,21 +33,35 @@ class ElementData(BaseModel):
     element: dict
     context: dict = None
 
-async def generate_ai_prompt(element: dict) -> str:
+def clean_dom(dom: str) -> str:
+    """Удаляет тяжелые неполезные элементы из DOM."""
+    try:
+        tree = html.fromstring(dom)
+        etree.strip_elements(tree, 'script', 'style', 'svg')
+        return etree.tostring(tree, encoding='unicode', method='html')
+    except XMLSyntaxError as e:
+        raise HTTPException(status_code=422, detail=f"DOM parsing error: {str(e)}")
+
+async def generate_ai_prompt(element: dict, dom: str) -> str:
     """Формирует промпт согласно требованиям к XPath и полученным атрибутам."""
-    attrs = element.get("attributes", {})
+    attrs = {attr['name']: attr['value'] for attr in element.get("attributes", [])}
     attributes_str = " ".join([f'@{k}="{v}"' for k, v in attrs.items()])
     return (
-        f"Generate stable XPath for <{element['tag']}> element. Rules:\n"
-        "1. Prefer unique attributes: id, data-test-id, aria-label\n"
+        f"Generate stable XPath for the following HTML element within the given DOM. "
+        f"Rules:\n"
+        "1. Prefer unique attributes: id, data-id, class, alt, title\n"
         "2. Use indexes only when necessary\n"
-        "3. Avoid fragile class combinations\n"
-        "4. Consider parent hierarchy carefully\n\n"
-        f"Available attributes: {attributes_str}\n"
+        "3. Avoid numbers and ids in attribute values\n"
+        "4. Avoid fragile class combinations\n"
+        "5. Consider parent hierarchy carefully\n\n"
+        "6. Check if the element exist in the DOM\n\n"
+        "7. Check if the element is unique in the DOM\n\n"
+        f"HTML Element: <{element['tag']} {attributes_str}>\n\n"
+        f"DOM:\n{dom}\n\n"
         "Return ONLY XPath without explanations."
     )
 
-async def call_deepseek_api(prompt: str) -> str:
+async def call_model_api(prompt: str) -> str:
     """Отправляет запрос к API, возвращает сгенерированный ответ как строку."""
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -56,9 +70,19 @@ async def call_deepseek_api(prompt: str) -> str:
     }
     payload = {
         "model": MODEL_NAME,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.1,
-        "max_tokens": 100
+        "messages": [
+            {"role": "system", "content": "You are a helpful stable XPath finder assistant"},
+            {"role": "user", "content": prompt}
+            ],
+        "stream": False,
+        "max_tokens": 512,
+        "stop": ["null"],
+        "temperature": 0.7,
+        "top_p": 0.7,
+        "top_k": 50,
+        "frequency_penalty": 0.5,
+        "n": 1,
+        "response_format": {"type": "text"}
     }
 
     try:
@@ -83,7 +107,7 @@ def generate_simple_xpath(element: dict) -> str:
     return "".join(xpath_parts)
 
 @app.post("/generate-xpath")
-async def generate_xpath(data: ElementData, use_ai: bool = Query(False, description="Use AI for XPath generation")):
+async def generate_xpath(data: ElementData, use_ai: bool = Query(True, description="Use AI for XPath generation")):
     """Принимает DOM и данные элемента, вызывает DeepSeek API для генерации XPath или использует простую генерацию."""
     try:
         if not data.dom.strip():
@@ -96,14 +120,18 @@ async def generate_xpath(data: ElementData, use_ai: bool = Query(False, descript
         except XMLSyntaxError as e:
             raise HTTPException(status_code=422, detail=f"DOM parsing error: {str(e)}")
 
+        cleaned_dom = clean_dom(data.dom)
+
         if use_ai:
-            prompt = await generate_ai_prompt(data.element)
+            prompt = await generate_ai_prompt(data.element, cleaned_dom)
             logging.debug(f"Generated prompt: {prompt}")
 
             try:
-                full_xpath = await call_deepseek_api(prompt)
+                full_xpath = await call_model_api(prompt)
             except HTTPException as e:
                 raise e
+
+            logging.debug(f"Generated Response: {full_xpath}")
 
             if not full_xpath.startswith('/'):
                 raise HTTPException(status_code=422, detail="Invalid XPath format")
