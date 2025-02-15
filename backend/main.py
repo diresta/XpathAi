@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from lxml import html, etree
 from lxml.etree import XMLSyntaxError
 import logging
+from dotenv import load_dotenv
+import os
 
 # python -m venv .venv
 # .\.venv\Scripts\activate
@@ -16,9 +18,10 @@ logging.basicConfig(level=logging.DEBUG)
 
 app = FastAPI()
 
-API_URL = ""
-API_KEY = ""
-MODEL_NAME = ""
+load_dotenv()
+API_URL = os.getenv("API_URL")
+API_KEY = os.getenv("API_KEY")
+MODEL_NAME = os.getenv("MODEL_NAME")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,31 +38,36 @@ class ElementData(BaseModel):
 
 def clean_dom(dom: str) -> str:
     """Удаляет тяжелые неполезные элементы из DOM."""
+    logging.debug(f"Original DOM size: {len(dom)} characters")
     try:
         tree = html.fromstring(dom)
-        etree.strip_elements(tree, 'script', 'style', 'svg')
-        return etree.tostring(tree, encoding='unicode', method='html')
+        etree.strip_elements(tree, 'noscript', 'script','meta', 'link', 'style', with_tail=True)
+        etree.strip_elements(tree, 'svg', with_tail=True)
+        cleaned_dom = etree.tostring(tree, encoding='unicode', method='html')
+        logging.debug(f"Cleaned DOM size: {len(cleaned_dom)} characters")
+
+        if len(cleaned_dom) > 1000000:
+            logging.error(f"Cleaned DOM size exceeds 1MB: {len(cleaned_dom)} characters")
+         
+        remaining_svgs = tree.xpath('//svg')
+        if remaining_svgs:
+            logging.warning(f"SVG elements still present in DOM: {len(remaining_svgs)}")
+        else:
+            logging.debug("All SVG elements successfully removed from DOM")
+        
+        return cleaned_dom
     except XMLSyntaxError as e:
         raise HTTPException(status_code=422, detail=f"DOM parsing error: {str(e)}")
 
-async def generate_ai_prompt(element: dict, dom: str) -> str:
+def generate_ai_prompt(element: dict, dom: str) -> str:
     """Формирует промпт согласно требованиям к XPath и полученным атрибутам."""
-    attrs = {attr['name']: attr['value'] for attr in element.get("attributes", [])}
-    attributes_str = " ".join([f'@{k}="{v}"' for k, v in attrs.items()])
-    return (
-        f"Generate stable XPath for the following HTML element within the given DOM. "
-        f"Rules:\n"
-        "1. Prefer unique attributes: id, data-id, class, alt, title\n"
-        "2. Use indexes only when necessary\n"
-        "3. Avoid numbers and ids in attribute values\n"
-        "4. Avoid fragile class combinations\n"
-        "5. Consider parent hierarchy carefully\n\n"
-        "6. Check if the element exist in the DOM\n\n"
-        "7. Check if the element is unique in the DOM\n\n"
-        f"HTML Element: <{element['tag']} {attributes_str}>\n\n"
-        f"DOM:\n{dom}\n\n"
-        "Return ONLY XPath without explanations."
-    )
+#    attrs = {attr['name']: attr['value'] for attr in element.get("attributes", [])}
+#    attributes_str = " ".join([f'@{k}="{v}"' for k, v in attrs.items()])
+    
+    with open("prompt_template.txt", "r", encoding="utf-8") as file:
+        template = file.read()
+    
+    return template.format(element=element.get('html'), dom=dom)
 
 async def call_model_api(prompt: str) -> str:
     """Отправляет запрос к API, возвращает сгенерированный ответ как строку."""
@@ -86,7 +94,7 @@ async def call_model_api(prompt: str) -> str:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(API_URL, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
@@ -107,52 +115,36 @@ def generate_simple_xpath(element: dict) -> str:
     return "".join(xpath_parts)
 
 @app.post("/generate-xpath")
-async def generate_xpath(data: ElementData, use_ai: bool = Query(True, description="Use AI for XPath generation")):
-    """Принимает DOM и данные элемента, вызывает DeepSeek API для генерации XPath или использует простую генерацию."""
+async def generate_xpath(data: ElementData, use_ai: bool = Query(False, description="Use AI for XPath generation")):
+    """Принимает DOM и данные элемента, вызывает API для генерации XPath или использует простую генерацию."""
     try:
         if not data.dom.strip():
             raise HTTPException(status_code=400, detail="Empty DOM")
-        if not data.element.get("tag"):
-            raise HTTPException(status_code=400, detail="Missing element tag")
-
-        try:
-            tree = html.fromstring(data.dom)
-        except XMLSyntaxError as e:
-            raise HTTPException(status_code=422, detail=f"DOM parsing error: {str(e)}")
 
         cleaned_dom = clean_dom(data.dom)
+        
+        prompt = generate_ai_prompt(data.element, cleaned_dom)
+        truncated_prompt = (prompt[:5000] + '...') if len(prompt) > 500 else prompt
+        logging.debug(f"Prompt to deliver: {truncated_prompt}")
 
         if use_ai:
-            prompt = await generate_ai_prompt(data.element, cleaned_dom)
-            logging.debug(f"Generated prompt: {prompt}")
-
             try:
                 full_xpath = await call_model_api(prompt)
             except HTTPException as e:
                 raise e
-
             logging.debug(f"Generated Response: {full_xpath}")
-
-            if not full_xpath.startswith('/'):
-                raise HTTPException(status_code=422, detail="Invalid XPath format")
-            try:
-                elements = tree.xpath(full_xpath)
-            except Exception as e:
-                raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
-
-            if not elements:
-                raise HTTPException(status_code=404, detail="XPath not found in DOM")
+            
         else:
             full_xpath = generate_simple_xpath(data.element)
             logging.debug(f"Generated simple XPath: {full_xpath}")
-
-            try:
-                elements = tree.xpath(full_xpath)
-            except Exception as e:
-                raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
-
-            if not elements:
-                raise HTTPException(status_code=404, detail="XPath not found in DOM")
+        
+        tree = html.fromstring(cleaned_dom)
+        try:
+            elements = tree.xpath(full_xpath)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
+        if not elements:
+            raise HTTPException(status_code=404, detail="XPath not found in DOM")
 
         return {"xpath": full_xpath}
     except HTTPException as he:

@@ -102,6 +102,7 @@ function handleClick(e) {
             element: {
                 x: e.clientX,
                 y: e.clientY,
+                html: element.outerHTML,
                 tag: element.tagName,
                 attributes: Array.from(element.attributes).map(attr => ({
                     name: attr.name,

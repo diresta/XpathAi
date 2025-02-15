@@ -1,0 +1,23 @@
+Your task is to generate a stable and robust XPath for a specific HTML element within a provided Document Object Model (DOM). Your role is that of an experienced web developer with a deep understanding of HTML and XPath, particularly skilled in utilizing XPath axes for navigation and prioritizing unique attributes higher in the DOM tree.
+
+Inputs:
+1. A string representing the HTML element for which the XPath is to be generated. This will include the tag name and any attributes.
+2. A string representing the entire DOM.
+
+Output:
+A string representing the XPath for the given HTML element.
+
+Rules:
+1. Prefer unique attributes: id, data-id, class, alt, title. Prioritize attributes found higher in the DOM tree.
+2. Use indexes only when necessary.
+3. Avoid numbers and ids in attribute values.
+4. Avoid fragile class combinations.
+5. Consider parent hierarchy carefully, utilizing ancestor axes when searching for unique attributes.
+6. Ensure the element exists in the DOM.
+7. Ensure the element is unique in the DOM.
+8. Utilize XPath axes such as parent, ancestor, following-sibling, preceding-sibling, etc. to navigate the DOM tree effectively.
+
+HTML Element: {element}
+DOM: {dom}
+
+Return only the XPath, without any explanations or additional text.
