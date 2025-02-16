@@ -120,32 +120,33 @@ async def generate_xpath(data: ElementData, use_ai: bool = Query(False, descript
 
         cleaned_dom = clean_dom(data.dom)
 
+        if not isinstance(use_ai, bool):
+            raise HTTPException(status_code=400, detail="Invalid value for use_ai. It must be a boolean.")
+        
         prompt = generate_ai_prompt(data.element, cleaned_dom)
         final_prompt = (prompt[:5000] + '...') if len(prompt) > 500 else prompt
         logging.debug(f"Prompt to deliver: {final_prompt}")
-
-        if not isinstance(use_ai, bool):
-            raise HTTPException(status_code=400, detail="Invalid value for use_ai. It must be a boolean.")
 
         if use_ai:
             try:
                 full_xpath = await call_model_api(prompt)
             except HTTPException as e:
                 raise e
-            logging.debug(f"Generated Response: {full_xpath}")
-            
+            logging.debug(f"Generated Response: {full_xpath}")   
         else:
-            try:
-                tree = html.fromstring(cleaned_dom)
-                elements = tree.xpath(full_xpath)
-                if not elements:
-                    raise HTTPException(status_code=404, detail="XPath not found in DOM")
-            except XMLSyntaxError as e:
-                raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
-            except Exception as e:
-                raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
+            full_xpath = generate_simple_xpath(data.element)
+
+        try:
+            tree = html.fromstring(cleaned_dom)
+            elements = tree.xpath(full_xpath)
             if not elements:
-                raise HTTPException(status_code=404, detail="XPath not found in DOM")
+                 raise HTTPException(status_code=404, detail="XPath not found in DOM")
+        except XMLSyntaxError as e:
+            raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
+        
+        logging.debug(f"Done! Xpath: {full_xpath}")   
 
         return {"xpath": full_xpath}
     except Exception as e:
