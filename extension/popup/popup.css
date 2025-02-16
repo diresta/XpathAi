@@ -2,30 +2,42 @@ body {
     font-family: Arial, sans-serif;
     width: 300px;
     padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 button {
-    padding: 8px 12px;
+    padding: 10px 15px;
     background: #007bff;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease;
+}
+
+button:hover {
+    background: #0056b3;
 }
 
 #status {
     color: #666;
     margin: 10px 0;
+    font-size: 14px;
 }
 
 #xpathOutput {
-    width: 100%;
-    padding: 8px;
+    width: 98%;
+    padding: 10px;
     margin-top: 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-family: monospace;
     cursor: pointer;
+    background-color: #fff;
+    transition: border-color 0.3s ease;
 }
 
 #xpathOutput:focus {
@@ -36,4 +48,15 @@ button {
 .error {
     color: #dc3545;
     border-color: #dc3545;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.container button {
+    width: 100%;
+    margin-bottom: 10px;
 }

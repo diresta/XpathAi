@@ -34,9 +34,10 @@ function activateSelection() {
     if (isSelectionActive) return;
     console.log("Activating selection");
     isSelectionActive = true;
-    document.addEventListener('mouseover', handleMouseOver);
-    document.addEventListener('mouseout', handleMouseOut);
-    document.addEventListener('click', handleClick);
+    
+    document.addEventListener('mouseover', handleMouseOver, true);
+    document.addEventListener('mouseout', handleMouseOut, true);
+    document.addEventListener('click', handleClick, true);
 }
 
 // Деактивация выбора элемента
