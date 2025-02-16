@@ -35,31 +35,26 @@ class ElementData(BaseModel):
     dom: str
     element: dict
     context: dict = None
+    use_ai: bool = False
 
 def clean_dom(dom: str) -> str:
     """Clean the DOM from unwanted elements and attributes."""
     logging.debug(f"Original DOM size: {len(dom)} characters")
     try:
         tree = html.fromstring(dom)
-        for el in tree.xpath("//noscript | //script | //meta | //link | //style | //svg"):
-            if el.getparent() is not None:
-                el.getparent().remove(el)
-
-        cleaned_dom = etree.tostring(tree, encoding='unicode', method='html')
-        logging.debug(f"Cleaned DOM size: {len(cleaned_dom)} characters")
-
-        if len(cleaned_dom) > 100000:
-            logging.error(f"Cleaned DOM size exceeds 100KB: {len(cleaned_dom)} characters")
-         
-        remaining_svgs = tree.xpath('//svg')
-        if remaining_svgs:
-            logging.warning(f"SVG elements still present in DOM: {len(remaining_svgs)}")
-        else:
-            logging.debug("All SVG elements successfully removed from DOM")
-        
-        return cleaned_dom
     except XMLSyntaxError as e:
         raise HTTPException(status_code=422, detail=f"DOM parsing error: {str(e)}")
+    
+    for el in tree.xpath("//noscript | //script | //meta | //link | //style | //svg"):
+        if el.getparent() is not None:
+            el.getparent().remove(el)
+
+    cleaned_dom = etree.tostring(tree, encoding='unicode', method='html')
+    logging.debug(f"Cleaned DOM size: {len(cleaned_dom)} characters")
+
+    if len(cleaned_dom) > 100000:
+        logging.error(f"Cleaned DOM size exceeds 100KB!")
+    return cleaned_dom
 
 def generate_ai_prompt(element: dict, dom: str) -> str:
     """Generates a prompt for the AI model."""
@@ -103,7 +98,7 @@ async def call_model_api(prompt: str) -> str:
         raise HTTPException(status_code=502, detail="Error calling AI service")
 
 def generate_simple_xpath(element: dict) -> str:
-    """simple XPath generationна from element attributes."""
+    """simple XPath generation from element attributes."""
     xpath_parts = [f"//{element['tag'].lower()}"]
     attributes = {attr['name']: attr['value'] for attr in element.get("attributes", [])}
 
@@ -114,24 +109,25 @@ def generate_simple_xpath(element: dict) -> str:
     return "".join(xpath_parts)
 
 @app.post("/generate-xpath")
-async def generate_xpath(data: ElementData, use_ai: bool = Query(False, description="Use AI for XPath generation")):
+async def generate_xpath(data: ElementData):
     """Accepts DOM and element data, calls API for XPath generation or uses simple generation."""
     try:
         if not data.dom.strip():
             raise HTTPException(status_code=400, detail="Empty DOM")
 
         cleaned_dom = clean_dom(data.dom)
+        use_ai = data.use_ai
 
         if not isinstance(use_ai, bool):
             raise HTTPException(status_code=400, detail="Invalid value for use_ai. It must be a boolean.")
         
         prompt = generate_ai_prompt(data.element, cleaned_dom)
-        final_prompt = (prompt[:5000] + '...') if len(prompt) > 500 else prompt
+        final_prompt = (prompt[:70000] + '...') if len(prompt) > 70000 else prompt
         logging.debug(f"Prompt to deliver: {final_prompt}")
 
         if use_ai:
             try:
-                full_xpath = await call_model_api(prompt)
+                full_xpath = await call_model_api(final_prompt)
             except HTTPException as e:
                 raise e
             logging.debug(f"Generated Response: {full_xpath}")   
@@ -142,13 +138,14 @@ async def generate_xpath(data: ElementData, use_ai: bool = Query(False, descript
             tree = html.fromstring(cleaned_dom)
             elements = tree.xpath(full_xpath)
             if not elements:
-                 raise HTTPException(status_code=404, detail="XPath not found in DOM")
+                logging.error("XPath not found in DOM", exc_info=True)
         except XMLSyntaxError as e:
             raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
+
         logging.debug(f"Done! Xpath: {full_xpath}")   
 
         return {"xpath": full_xpath}
     
     except Exception as e:
-        logging.error(f"Unexpected error: {str(e)} | Data: {data.model_dump()} | use_ai: {use_ai}", exc_info=True)
+        logging.error(f"Unexpected error: {str(e)} | element: {data.element} | use_ai: {use_ai}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
