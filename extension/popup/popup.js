@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const xpathOutput = document.getElementById('xpathOutput');
     const selectElementButton = document.getElementById('selectElement');
     const loaderElem = document.getElementById('loader');
+    const settingsButton = document.getElementById('openSettings');
 
     // Обновление интерфейса
     const updateUI = () => {
@@ -46,6 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     statusElem.textContent = 'Не удалось скопировать XPath.';
                 });
         }
+    });
+
+    settingsButton.addEventListener('click', () => {
+        chrome.runtime.openOptionsPage();
     });
 
     chrome.storage.onChanged.addListener(updateUI);

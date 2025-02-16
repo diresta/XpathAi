@@ -22,7 +22,6 @@ function init() {
     isInitialized = true;
 
     chrome.runtime.onMessage.addListener((message) => {
-        console.log("Message received in content script:", message);
         if (message.type === "activateSelection") {
             activateSelection();
         }
