@@ -60,3 +60,8 @@ button:hover {
     width: 100%;
     margin-bottom: 10px;
 }
+
+.loader {
+    font-size: 14px;
+    color: #666;
+}

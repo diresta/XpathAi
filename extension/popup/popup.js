@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusElem = document.getElementById('status');
     const xpathOutput = document.getElementById('xpathOutput');
     const selectElementButton = document.getElementById('selectElement');
+    const loaderElem = document.getElementById('loader');
 
     // Обновление интерфейса
     const updateUI = () => {
@@ -18,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 xpathOutput.value = '';
                 xpathOutput.classList.remove('error');
             }
+
+            loaderElem.style.display = data.status === 'Загрузка...' ? 'block' : 'none';
         });
     };
 

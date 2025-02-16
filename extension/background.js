@@ -7,6 +7,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     if (message.type === "elementSelected") {
+        chrome.storage.local.set({ status: 'Загрузка...' });
         fetch("http://localhost:8000/generate-xpath", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
