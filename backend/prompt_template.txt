@@ -8,7 +8,7 @@ Output:
 A string representing the XPath for the given HTML element.
 
 Rules:
-1. Prefer unique attributes: id, data-id, class, alt, title. Prioritize attributes found higher in the DOM tree.
+1. Prefer unique attributes: id, data-id, class, alt, title and others. Prioritize attributes found higher in the DOM tree.
 2. Use indexes only when necessary.
 3. Avoid numbers and ids in attribute values.
 4. Avoid fragile class combinations.
@@ -20,4 +20,4 @@ Rules:
 HTML Element: {element}
 DOM: {dom}
 
-Return only the XPath, without any explanations or additional text.
+Return only the XPath in string, without any explanations or additional text.
