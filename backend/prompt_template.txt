@@ -16,8 +16,7 @@ Rules:
 6. Ensure the element exists in the DOM.
 7. Ensure the element is unique in the DOM.
 8. Utilize XPath axes such as parent, ancestor, following-sibling, preceding-sibling, etc. to navigate the DOM tree effectively.
+9. Return only the XPath in string, without any explanations or additional text.
 
 HTML Element: {element}
 DOM: {dom}
-
-Return only the XPath in string, without any explanations or additional text.

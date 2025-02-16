@@ -41,8 +41,10 @@ def clean_dom(dom: str) -> str:
     logging.debug(f"Original DOM size: {len(dom)} characters")
     try:
         tree = html.fromstring(dom)
-        etree.strip_elements(tree, 'noscript', 'script','meta', 'link', 'style', with_tail=True)
-        etree.strip_elements(tree, 'svg', with_tail=True)
+        for el in tree.xpath("//noscript | //script | //meta | //link | //style | //svg"):
+            if el.getparent() is not None:
+                el.getparent().remove(el)
+
         cleaned_dom = etree.tostring(tree, encoding='unicode', method='html')
         logging.debug(f"Cleaned DOM size: {len(cleaned_dom)} characters")
 
@@ -143,12 +145,10 @@ async def generate_xpath(data: ElementData, use_ai: bool = Query(False, descript
                  raise HTTPException(status_code=404, detail="XPath not found in DOM")
         except XMLSyntaxError as e:
             raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
-        except Exception as e:
-            raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
-        
         logging.debug(f"Done! Xpath: {full_xpath}")   
 
         return {"xpath": full_xpath}
+    
     except Exception as e:
-        logging.error(f"Unexpected error: {str(e)}", exc_info=True)
+        logging.error(f"Unexpected error: {str(e)} | Data: {data.model_dump()} | use_ai: {use_ai}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
