@@ -108,6 +108,16 @@ def generate_simple_xpath(element: dict) -> str:
             break
     return "".join(xpath_parts)
 
+def clean_response(xpath: str) -> str:
+    """Clean the XPath response to remove any formatting."""
+    cleaned_xpath = xpath.strip()
+    if cleaned_xpath.startswith("```xpath"):
+        cleaned_xpath = cleaned_xpath[len("```xpath"):].strip()
+    if cleaned_xpath.endswith("```"):
+        cleaned_xpath = cleaned_xpath[:-len("```")].strip()
+    logging.debug(f"Cleaned XPath: {cleaned_xpath}")
+    return cleaned_xpath
+
 @app.post("/generate-xpath")
 async def generate_xpath(data: ElementData):
     """Accepts DOM and element data, calls API for XPath generation or uses simple generation."""
@@ -127,10 +137,11 @@ async def generate_xpath(data: ElementData):
 
         if use_ai:
             try:
-                full_xpath = await call_model_api(final_prompt)
+                response = await call_model_api(final_prompt)
             except HTTPException as e:
                 raise e
-            logging.debug(f"Generated Response: {full_xpath}")   
+            logging.debug(f"Generated Response: {response}")
+            full_xpath = clean_response(response)   
         else:
             full_xpath = generate_simple_xpath(data.element)
 
