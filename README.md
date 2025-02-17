@@ -1,5 +1,4 @@
 # XPathAi
-
 Расширение для Google Chrome и backend на FastAPI, упрощающее поиск устойчивых XPath-локаторов.
 
 ## Структура проекта
@@ -32,10 +31,10 @@
    API_KEY=<API ключ>
    MODEL_NAME=<Название модели>
    ```
-   Тестил на: 
-   THUDM/glm-4-9b-chat
-   deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
-   Qwen/Qwen2.5-Coder-7B-Instruct
+   Тестил на:
+   - THUDM/glm-4-9b-chat
+   - deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
+   - Qwen/Qwen2.5-Coder-7B-Instruct
 
 4. Запустите сервер:
    ```bash
