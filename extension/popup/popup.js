@@ -2,7 +2,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusElem = document.getElementById('status');
     const xpathOutput = document.getElementById('xpathOutput');
     const selectElementButton = document.getElementById('selectElement');
-    const loaderElem = document.getElementById('loader');
     const settingsButton = document.getElementById('openSettings');
 
     // Обновление интерфейса
@@ -13,15 +12,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.xpath) {
                 xpathOutput.value = data.xpath;
                 xpathOutput.classList.remove('error');
+                xpathOutput.classList.add('success');
             } else if (data.error) {
                 xpathOutput.value = `Ошибка: ${data.error}`;
+                xpathOutput.classList.remove('success');
                 xpathOutput.classList.add('error');
             } else {
                 xpathOutput.value = '';
                 xpathOutput.classList.remove('error');
+                xpathOutput.classList.remove('success');
             }
-
-            loaderElem.style.display = data.status === 'Загрузка...' ? 'block' : 'none';
         });
     };
 
