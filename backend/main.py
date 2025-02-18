@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from lxml import html, etree
-from lxml.etree import XMLSyntaxError
+from lxml.etree import XMLSyntaxError, XPathEvalError
 import logging
 from dotenv import load_dotenv
 import os
@@ -108,14 +108,28 @@ def generate_simple_xpath(element: dict) -> str:
             break
     return "".join(xpath_parts)
 
-def clean_response(xpath: str) -> str:
-    """Clean the XPath response to remove any formatting."""
-    cleaned_xpath = xpath.strip()
-    if cleaned_xpath.startswith("```xpath"):
-        cleaned_xpath = cleaned_xpath[len("```xpath"):].strip()
-    if cleaned_xpath.endswith("```"):
-        cleaned_xpath = cleaned_xpath[:-len("```")].strip()
+def clean_response(response: str, cleaned_dom: str) -> str:
+    """Return only the XPath from the response, removing any code fences and explanations."""
+    lines = response.replace("```", "").splitlines()
+    cleaned_xpath = ""
+    for line in lines:
+        line = line.strip()
+        if line.startswith("//") or line.startswith(".//"):
+            cleaned_xpath = line
+            break
+    if not cleaned_xpath:
+        cleaned_xpath = response.strip()
+
+    tree = html.fromstring(cleaned_dom)
+    try:
+        elements = tree.xpath(cleaned_xpath)
+        if not elements:
+            logging.error("XPath not found in DOM", exc_info=True)
+    except XPathEvalError as e:
+        logging.error(f"Invalid XPath but whatever", exc_info=True)
+
     logging.debug(f"Cleaned XPath: {cleaned_xpath}")
+
     return cleaned_xpath
 
 @app.post("/generate-xpath")
@@ -133,29 +147,22 @@ async def generate_xpath(data: ElementData):
         
         prompt = generate_ai_prompt(data.element, cleaned_dom)
         final_prompt = (prompt[:70000] + '...') if len(prompt) > 70000 else prompt
-        logging.debug(f"Prompt to deliver: {final_prompt}")
+        logging.debug(f"Prompt to deliver: {len(final_prompt)} context, {final_prompt}")
 
+        response = ""
         if use_ai:
             try:
                 response = await call_model_api(final_prompt)
             except HTTPException as e:
                 raise e
             logging.debug(f"Generated Response: {response}")
-            full_xpath = clean_response(response)   
+            xpath = clean_response(response, cleaned_dom)   
         else:
-            full_xpath = generate_simple_xpath(data.element)
+            xpath = generate_simple_xpath(data.element)
 
-        try:
-            tree = html.fromstring(cleaned_dom)
-            elements = tree.xpath(full_xpath)
-            if not elements:
-                logging.error("XPath not found in DOM", exc_info=True)
-        except XMLSyntaxError as e:
-            raise HTTPException(status_code=422, detail=f"Invalid XPath syntax: {str(e)}")
+        logging.debug(f"Done! Xpath: {xpath}")
 
-        logging.debug(f"Done! Xpath: {full_xpath}")   
-
-        return {"xpath": full_xpath}
+        return {"response": response, "xpath": xpath}
     
     except Exception as e:
         logging.error(f"Unexpected error: {str(e)} | element: {data.element} | use_ai: {use_ai}", exc_info=True)

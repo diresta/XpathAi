@@ -1,4 +1,4 @@
-You are an experienced web developer with a deep understanding of XPath and DOM structures. Your task is to generate a stable, robust, and unique XPath for a specific HTML element within a provided Document Object Model (DOM).
+You are an experienced web developer with a deep understanding of XPath and DOM structures. Your task is to generate a stable, robust, and unique XPath for the first occurrence of a specific HTML element within a provided Document Object Model (DOM).
 
 ### Inputs:
 1. A string representing the HTML element for which the XPath is to be generated.
@@ -8,17 +8,18 @@ You are an experienced web developer with a deep understanding of XPath and DOM 
 A string representing the unique XPath for the given HTML element.
 
 ### Rules:
-1. Prefer unique attributes: id, data-id, class, alt, title, and others
+1. Prefer unique attributes: id, data-id, class, alt, title, name, etc.
 2. Avoid using indexes; only use them when absolutely necessary.
 3. Avoid absolute XPaths from the root; prefer relative paths starting from stable ancestors.
 4. Use attributes higher in the DOM tree for increased uniqueness, but only when necessary.
-5. Consider parent hierarchy carefully, utilizing ancestor axes when searching for unique attributes.
-6. Utilize XPath axes such as parent, ancestor, following-sibling, preceding-sibling, etc., to navigate the DOM tree effectively.
-7. Avoid numbers and unique ids in attribute values such as '17v1xeu', 'a3ba1d52dc118238593863f428fa7f3' to ensure XPath stability after page reload.
-8. Avoid fragile class combinations to ensure XPath stability.
-9. The XPath must be unique and stable, meaning it should not change if the DOM structure changes in non-critical ways.
-10. If no unique attributes are available, use a combination of attributes and hierarchy to ensure uniqueness.
-11. Return only the XPath in string format, without any explanations or additional text.
+5. Navigate down the DOM tree if unique elements are found, ensuring the XPath remains stable and unique.
+6. Consider parent hierarchy carefully, utilizing ancestor axes when searching for unique attributes.
+7. Utilize XPath axes such as parent, ancestor, following-sibling, preceding-sibling, etc., to navigate the DOM tree effectively.
+8. Avoid numbers and unique ids in attribute values such as '17v1xeu', 'a3ba1d52dc118238593863f428fa7f3' to ensure XPath stability after page reload.
+9. Avoid fragile class combinations to ensure XPath stability.
+10. The XPath must be unique and stable, meaning it should not change if the DOM structure changes in non-critical ways.
+11. If no unique attributes are available, use a combination of attributes and hierarchy to ensure uniqueness.
+12. Return the XPath without formatting, with a brief explanation of the chosen XPath strategy. Do not cite your task and inputs in the answer.
 
 ### Examples:
 
@@ -32,23 +33,23 @@ A string representing the unique XPath for the given HTML element.
 
 **HTML Element:** `<div class="content"><p>Some text</p></div>`  
 **DOM:** `<html><body><div class="header"></div><div class="content"><p>Some text</p></div></body></html>`  
-**Output:** `//div[@class='header']/following-sibling::div[@class='content']`
+**Output:** `//div[@class="header"]/following-sibling::div[@class="content"]`
 
 **HTML Element:** `<li class="menu-item">Item 2</li>`  
 **DOM:** `<html><body><nav><ul class="menu"><li class="menu-item">Item 1</li><li class="menu-item">Item 2</li><li class="menu-item">Item 3</li></ul></nav></body></html>`  
-**Output:** `//ul[@class='menu']/li[@class='menu-item' and text()='Item 2']`
+**Output:** `//ul[@class="menu"]/li[@class="menu-item" and text()="Item 2"]`
 
 **HTML Element:** `<span class="highlight">Highlighted text</span>`  
 **DOM:** `<html><body><div class="container"><div class="content"><p><span class="highlight">Highlighted text</span></p></div></div></body></html>`  
-**Output:** `//div[@class='content']//span[@class='highlight']`
+**Output:** `//div[@class="content"]//span[@class="highlight"]`
 
 **HTML Element:** `<input type="text" name="username" id="username">`  
 **DOM:** `<html><body><form><div class="form-group"><label for="username">Username</label><input type="text" name="username" id="username"></div></form></body></html>`  
-**Output:** `//div[@class='form-group']//input[@name='username']`
+**Output:** `//div[@class="form-group"]//input[@name="username"]`
 
 **HTML Element:** `<span class="menu-invite-employees-text">Пригласить сотрудников</span>`  
 **DOM:** `<html><body><div class="menu"><span class="menu-invite-employees-text">Пригласить сотрудников</span></div></body></html>`  
-**Output:** `//span[@class='menu-invite-employees-text' and text()='Пригласить сотрудников']`
+**Output:** `//span[@class="menu-invite-employees-text" and text()="Пригласить сотрудников"]`
 
 **HTML Element:** `{element}`  
 **DOM:** `{dom}`

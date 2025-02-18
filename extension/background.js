@@ -28,6 +28,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             .then(data => {
                 chrome.storage.local.set({ 
                     status: 'Готово',
+                    response: data.response,
                     xpath: data.xpath,
                     error: null
                 });

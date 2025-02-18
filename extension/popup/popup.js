@@ -1,14 +1,33 @@
 document.addEventListener('DOMContentLoaded', () => {
     const statusElem = document.getElementById('status');
+    const responseOutput = document.getElementById('responseOutput');
     const xpathOutput = document.getElementById('xpathOutput');
     const selectElementButton = document.getElementById('selectElement');
     const settingsButton = document.getElementById('openSettings');
 
     // Обновление интерфейса
     const updateUI = () => {
-        chrome.storage.local.get(['status', 'xpath', 'error'], (data) => {
+        chrome.storage.local.get(['status', 'response', 'xpath', 'error'], (data) => {
+            if (chrome.runtime.lastError) {
+                statusElem.textContent = 'Ошибка при получении данных из хранилища.';
+                responseOutput.value = '';
+                responseOutput.classList.remove('error');
+                responseOutput.classList.remove('success');
+                xpathOutput.value = '';
+                xpathOutput.classList.remove('error');
+                xpathOutput.classList.remove('success');
+                return;
+            }
             statusElem.textContent = `Статус: ${data.status || 'Не активно'}`;
             
+            if (data.response) {
+                responseOutput.value = data.response;
+                responseOutput.classList.add('success');
+            } else {
+                responseOutput.value = '';
+                xpathOutput.classList.add('error');
+            }
+
             if (data.xpath) {
                 xpathOutput.value = data.xpath;
                 xpathOutput.classList.remove('error');

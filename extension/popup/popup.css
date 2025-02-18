@@ -46,6 +46,7 @@ button:hover {
     font-size: 10px;
 }
 
+#responseOutput,
 #xpathOutput {
     width: 100%;
     padding: 6px;
@@ -60,9 +61,16 @@ button:hover {
     color: #f0f0f0;
     transition: border-color 0.3s ease;
     font-size: 10px;
-    height: 30px;
 }
 
+#responseOutput {
+    height: 100px;
+    resize: vertical;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+#responseOutput:focus,
 #xpathOutput:focus {
     outline: none;
     border-color: #007bff;
@@ -95,6 +103,5 @@ button:hover {
 
 #selectElement {
     font-size: 14px;
-    padding: 8px 12px;
-    margin-left: 7px;
+    padding: 8px 10px;
 }
