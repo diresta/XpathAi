@@ -22,6 +22,7 @@ load_dotenv()
 API_URL = os.getenv("API_URL")
 API_KEY = os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME")
+MAX_PROMPT_LENGTH = int(os.getenv("MAX_PROMPT_LENGTH", "70000"))
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,18 +54,23 @@ def clean_dom(dom: str) -> str:
     logging.debug(f"Cleaned DOM size: {len(cleaned_dom)} characters")
 
     if len(cleaned_dom) > 100000:
-        logging.error(f"Cleaned DOM size exceeds 100KB!")
+        logging.warning(f"Cleaned DOM size exceeds 100KB!")
     return cleaned_dom
 
-def generate_ai_prompt(element: dict, dom: str) -> str:
+def generate_prompt(element: dict, dom: str) -> str:
     """Generates a prompt for the AI model."""
 #    attrs = {attr['name']: attr['value'] for attr in element.get("attributes", [])}
 #    attributes_str = " ".join([f'@{k}="{v}"' for k, v in attrs.items()])
     
     with open("prompt_template.txt", "r", encoding="utf-8") as file:
         template = file.read()
-    
-    return template.format(element=element.get('html'), dom=dom)
+    prompt = template.format(element=element.get('html'), dom=dom)
+
+    if len(prompt) > MAX_PROMPT_LENGTH:
+        logging.warning(f"Prompt length {len(prompt)} exceeds MAX_PROMPT_LENGTH ({MAX_PROMPT_LENGTH}). Truncating.")
+        final_prompt = prompt[:MAX_PROMPT_LENGTH]
+
+    return final_prompt
 
 async def call_model_api(prompt: str) -> str:
     """Calls the AI model API to generate XPath."""
@@ -117,6 +123,10 @@ def clean_response(response: str, cleaned_dom: str) -> str:
         if line.startswith("//") or line.startswith(".//"):
             cleaned_xpath = line
             break
+        elif "**XPath:**" in line:
+            raw_xpath = line.split("**XPath:**", 1)[1].strip().strip("`")
+            cleaned_xpath = raw_xpath
+            break
     if not cleaned_xpath:
         cleaned_xpath = response.strip()
 
@@ -126,7 +136,7 @@ def clean_response(response: str, cleaned_dom: str) -> str:
         if not elements:
             logging.error("XPath not found in DOM", exc_info=True)
     except XPathEvalError as e:
-        logging.error(f"Invalid XPath but whatever", exc_info=True)
+        logging.error("Invalid XPath but whatever", exc_info=True)
 
     logging.debug(f"Cleaned XPath: {cleaned_xpath}")
 
@@ -145,14 +155,13 @@ async def generate_xpath(data: ElementData):
         if not isinstance(use_ai, bool):
             raise HTTPException(status_code=400, detail="Invalid value for use_ai. It must be a boolean.")
         
-        prompt = generate_ai_prompt(data.element, cleaned_dom)
-        final_prompt = (prompt[:70000] + '...') if len(prompt) > 70000 else prompt
-        logging.debug(f"Prompt to deliver: {len(final_prompt)} context, {final_prompt}")
+        prompt = generate_prompt(data.element, cleaned_dom)
+        logging.debug(f"Prompt to deliver: {len(prompt)} context, {prompt}")
 
         response = ""
         if use_ai:
             try:
-                response = await call_model_api(final_prompt)
+                response = await call_model_api(prompt)
             except HTTPException as e:
                 raise e
             logging.debug(f"Generated Response: {response}")
