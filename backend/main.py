@@ -23,6 +23,7 @@ API_URL = os.getenv("API_URL")
 API_KEY = os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME")
 MAX_PROMPT_LENGTH = int(os.getenv("MAX_PROMPT_LENGTH", "70000"))
+PROMPT_TEMPLATE_FILE = os.getenv("PROMPT_TEMPLATE_FILE", "prompt_template2.txt")
 
 app.add_middleware(
     CORSMiddleware,
@@ -62,7 +63,7 @@ def generate_prompt(element: dict, dom: str) -> str:
 #    attrs = {attr['name']: attr['value'] for attr in element.get("attributes", [])}
 #    attributes_str = " ".join([f'@{k}="{v}"' for k, v in attrs.items()])
     
-    with open("prompt_template.txt", "r", encoding="utf-8") as file:
+    with open(PROMPT_TEMPLATE_FILE, "r", encoding="utf-8") as file:
         template = file.read()
     prompt = template.format(element=element.get('html'), dom=dom)
 

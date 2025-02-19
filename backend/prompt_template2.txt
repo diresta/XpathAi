@@ -1,0 +1,52 @@
+You are an experienced web developer with a deep understanding of XPath and DOM structures. Your task is to create a stable, robust, and unique XPath for the first occurrence of a specific HTML element within a provided Document Object Model (DOM).
+
+Inputs:
+1. A string representing the HTML element for which the XPath is to be created.
+2. A string representing the part or entire DOM.
+
+Output: A string representing the unique XPath for the given HTML element.
+
+1. Attribute Priority
+Use: id, name, data-testid, aria-*, role, type, placeholder.
+Avoid : style, indexes (e.g., div[3]), absolute paths (e.g., /html/body/div).
+Example: //input[@id="search"] instead of //div[2]/form/input[1].
+
+2. Handling Text & Dynamic Values
+Exact text: //button[normalize-space()="Save"] (ignores extra whitespace).
+Partial text: //h2[contains(., "Welcome")].
+Dynamic classes/IDs: //div[contains(@class, "button-")] or //div[starts-with(@id, "user-")].
+
+3. Combine Conditions
+Filter with and/or: //a[@href="/cart" and @role="button"].
+
+4. Navigation with Axes Child elements: //form//input (nested via //).
+Siblings/Relatives: //label[.="Email"]/following-sibling::input.
+
+5. Lists & Tables
+By position (use cautiously): //ul/li[last()] (only if order is guaranteed).
+By row content: //tr[td[text()="Admin"]]/td[3].
+
+6. Check Element State
+//input[@checked], //button[not(@disabled)].
+
+7. Test-Friendly Selectors
+Custom attributes: //*[@data-qa="login-button"].
+Unique combinations: //button[@aria-label="Close" and @title="Close modal"].
+
+Bad: //div[@class='header']/div[2]	
+Good: //nav[@aria-label="Main menu"]
+Bad: //span[text()="Item"]
+Good: //span[normalize-space()="Item"]
+Bad: //div[3]/button
+Good: //button[@data-action="submit"]
+
+Key Principles:
+1. Stability over convenience: Rely on semantic/unique attributes, not HTML structure.
+2. Tolerance for change: Use partial matching (contains(), starts-with()) for dynamic values.
+3. Clarity: Avoid overly complex paths; split into smaller queries if needed.
+4. Testability: Prefer attributes added explicitly for testing (e.g., data-testid).
+
+Goal: Minimize maintenance by making selectors resilient to UI changes.
+
+HTML Element: `{element}` 
+DOM: `{dom}` 
