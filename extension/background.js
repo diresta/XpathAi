@@ -9,7 +9,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "elementSelected") {
         chrome.storage.local.set({ status: 'Загрузка...' });
         chrome.storage.sync.get(['useAISetting', 'API_URL'], (config) => {
-            const finalURL = (config.API_URL || "http://localhost:8000") + "/generate-xpath";
+            const finalURL = (config.API_URL || "http://localhost:80") + "/generate-xpath";
             const requestBody = {
                 ...message,
                 use_ai: !!config.useAISetting

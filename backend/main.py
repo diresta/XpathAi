@@ -22,8 +22,8 @@ load_dotenv()
 API_URL = os.getenv("API_URL")
 API_KEY = os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME")
-MAX_PROMPT_LENGTH = int(os.getenv("MAX_PROMPT_LENGTH", "70000"))
-PROMPT_TEMPLATE_FILE = os.getenv("PROMPT_TEMPLATE_FILE", "prompt_template2.txt")
+MAX_PROMPT_LENGTH=70000
+PROMPT_TEMPLATE_FILE="prompt_template2.txt"
 
 app.add_middleware(
     CORSMiddleware,
