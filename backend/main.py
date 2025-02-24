@@ -23,6 +23,7 @@ API_URL = os.getenv("API_URL")
 API_KEY = os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME")
 MAX_PROMPT_LENGTH=70000
+REQUEST_TIMEOUT=60
 PROMPT_TEMPLATE_FILE="prompt_template2.txt"
 
 app.add_middleware(
@@ -70,6 +71,8 @@ def generate_prompt(element: dict, dom: str) -> str:
     if len(prompt) > MAX_PROMPT_LENGTH:
         logging.warning(f"Prompt length {len(prompt)} exceeds MAX_PROMPT_LENGTH ({MAX_PROMPT_LENGTH}). Truncating.")
         final_prompt = prompt[:MAX_PROMPT_LENGTH]
+    else:
+        final_prompt = prompt
 
     return final_prompt
 
@@ -95,7 +98,7 @@ async def call_model_api(prompt: str) -> str:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             response = await client.post(API_URL, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
