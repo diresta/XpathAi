@@ -1,56 +1,85 @@
-// Стили для подсветки
-if (!document.getElementById('xpath-helper-highlight-style')) {
-    const highlightStyle = document.createElement('style');
-    highlightStyle.id = 'xpath-helper-highlight-style';
-    highlightStyle.textContent = `
-        .xpath-helper-highlight {
-            outline: 2px solid #f00 !important;
-            box-shadow: 0 0 5px rgba(255, 0, 0, 0.5) !important;
-            background: rgba(255, 0, 0, 0.1) !important;
-            cursor: crosshair !important;
-        }
-    `;
-    document.head.appendChild(highlightStyle);
-}
-
 let highlightedElement = null;
 let isSelectionActive = false;
 let isInitialized = false;
 
+/**
+ * Initialize highlight styles once
+ */
+function setupHighlightStyles() {
+    if (!document.getElementById('xpath-helper-highlight-style')) {
+        const highlightStyle = document.createElement('style');
+        highlightStyle.id = 'xpath-helper-highlight-style';
+        highlightStyle.textContent = `
+            .xpath-helper-highlight {
+                outline: 2px solid #f00 !important;
+                box-shadow: 0 0 5px rgba(255, 0, 0, 0.5) !important;
+                background: rgba(255, 0, 0, 0.1) !important;
+                cursor: crosshair !important;
+            }
+        `;
+        document.head.appendChild(highlightStyle);
+    }
+}
+
 function init() {
-    if (isInitialized) return;
+    if (isInitialized) {
+        return;
+    }
+    
     isInitialized = true;
+    setupHighlightStyles();
 
     chrome.runtime.onMessage.addListener((message) => {
-        if (message.type === "activateSelection") {
-            activateSelection();
+        try {
+            switch (message.type) {
+                case "activateSelection":
+                    activateSelection();
+                    break;
+                    
+                case "checkXpathUniqueness":
+                    const duplicates = evaluateXpathCount(message.xpath);
+                    chrome.runtime.sendMessage({ 
+                        type: "xpathUniquenessResult", 
+                        duplicates 
+                    });
+                    break;
+            }
+        } catch (error) {
+            console.error("Error handling message:", message.type, error);
         }
     });
 }
 
-// Активация выбора элемента
 function activateSelection() {
-    if (isSelectionActive) return;
+    if (isSelectionActive) {
+        return;
+    }
+    
     console.log("Activating selection");
     isSelectionActive = true;
     
-    document.addEventListener('mouseover', handleMouseOver, true);
-    document.addEventListener('mouseout', handleMouseOut, true);
-    document.addEventListener('click', handleClick, true);
+    // Use capture phase for all events
+    const captureOptions = true;
+    document.addEventListener('mouseover', handleMouseOver, captureOptions);
+    document.addEventListener('mouseout', handleMouseOut, captureOptions);
+    document.addEventListener('click', handleClick, captureOptions);
 }
 
-// Деактивация выбора элемента
 function deactivateSelection() {
-    if (!isSelectionActive) return;
+    if (!isSelectionActive) {
+        return;
+    }
+    
     console.log("Deactivating selection");
     isSelectionActive = false;
     removeHighlight();
-    document.removeEventListener('mouseover', handleMouseOver);
-    document.removeEventListener('mouseout', handleMouseOut);
-    document.removeEventListener('click', handleClick);
+    
+    const captureOptions = true;
+    document.removeEventListener('mouseover', handleMouseOver, captureOptions);
+    document.removeEventListener('mouseout', handleMouseOut, captureOptions);
+    document.removeEventListener('click', handleClick, captureOptions);
 }
 
-// Функция для подсветки элемента
 function highlightElement(element) {
     if (highlightedElement) {
         highlightedElement.classList.remove('xpath-helper-highlight');
@@ -59,7 +88,6 @@ function highlightElement(element) {
     highlightedElement.classList.add('xpath-helper-highlight');
 }
 
-// Функция для снятия подсветки
 function removeHighlight() {
     if (highlightedElement) {
         highlightedElement.classList.remove('xpath-helper-highlight');
@@ -67,34 +95,38 @@ function removeHighlight() {
     }
 }
 
-// Обработчик наведения на элемент
 function handleMouseOver(e) {
-    if (!isSelectionActive) return;
+    if (!isSelectionActive) {
+        return;
+    }
     highlightElement(e.target);
 }
 
-// Обработчик ухода курсора с элемента
 function handleMouseOut(e) {
-    if (!isSelectionActive || !highlightedElement) return;
+    if (!isSelectionActive || !highlightedElement) {
+        return;
+    }
     if (e.target === highlightedElement) {
         removeHighlight();
     }
 }
 
-// Обработчик клика для выбора элемента
 function handleClick(e) {
-    if (!isSelectionActive) return;
+    if (!isSelectionActive) {
+        return;
+    }
+    
     e.preventDefault();
     e.stopPropagation();
 
     const element = e.target;
     const hadHighlight = element.classList.contains('xpath-helper-highlight');
 
-    // Временно удаляем класс
-    if (hadHighlight) 
+    // Temporarily remove highlight class to avoid it being included in the HTML
+    if (hadHighlight) {
         element.classList.remove('xpath-helper-highlight');
+    }
 
-    // Отправляем данные
     try {
         chrome.runtime.sendMessage({
             type: "elementSelected",
@@ -112,12 +144,35 @@ function handleClick(e) {
         });
     } catch (error) {
         console.error("Error sending message:", error);
+    } finally {
+        // Restore highlight class if it was removed
+        if (hadHighlight) {
+            element.classList.add('xpath-helper-highlight');
+        }
+        
+        deactivateSelection();
     }
-
-    if (hadHighlight) 
-        element.classList.add('xpath-helper-highlight');
-
-    deactivateSelection();
 }
 
+/**
+ * Evaluate XPath expression and return matching nodes count
+ */
+function evaluateXpathCount(xpath) {
+    try {
+        const snapshot = document.evaluate(
+            xpath, 
+            document, 
+            null, 
+            XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, 
+            null
+        );
+        return snapshot.snapshotLength;
+    } catch (error) {
+        console.error("Error evaluating XPath:", error);
+        return -1; // Signal error with negative count
+    }
+}
+
+// Initialize the extension
+setupHighlightStyles();
 init();

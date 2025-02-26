@@ -1,107 +1,142 @@
+:root {
+  /* Color palette */
+  --bg-primary: #2d2d2d;
+  --bg-secondary: #444;
+  --text-primary: #f0f0f0;
+  --text-secondary: #e0e0e0;
+  --text-muted: #666;
+  --accent-primary: #4a90e2;
+  --accent-hover: #357ab8;
+  --border-color: #ddd;
+  --success-color: #28a745;
+  --error-color: #dc3545;
+  
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 5px;
+  --space-md: 8px;
+  --space-lg: 12px;
+}
+
 body {
-    font-family: Arial, sans-serif;
-    width: 380px;
-    padding: 5px;
-    background-color: #2d2d2d;
-    color: #f0f0f0;
-    border-radius: 6px;
-    box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
-    position: relative;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  width: 380px;
+  padding: var(--space-sm);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 6px;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
+/* Layout components */
 .header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
 }
 
-#selectElement {
-    font-size: 14px;
-    padding: 8px 10px;
+.button-group {
+  display: flex;
+  gap: var(--space-sm);
 }
 
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* Buttons */
 button {
-    width: auto;
-    padding: 5px 10px;
-    background: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    transition: background 0.3s ease;
+  padding: 6px var(--space-lg);
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
 }
 
 button:hover {
-    background: #0056b3;
+  background: var(--accent-hover);
+  color: var(--text-secondary);
+}
+
+#selectElement {
+  font-size: 16px;
+  padding: var(--space-md) var(--space-lg);
+}
+
+#clear {
+  font-size: 18px;
 }
 
 #openSettings {
-    background: none;
-    color: #007bff;
-    font-size: 28px;
-    padding: 0;
-    border: none;
-    cursor: pointer;
+  background: none;
+  color: var(--accent-primary);
+  font-size: 28px;
+  padding: 0;
+  border: none;
+  margin-left: auto;
+  transition: color 0.3s ease;
 }
 
+#openSettings:hover {
+  color: var(--accent-hover);
+}
+
+/* Status and messages */
 #status {
-    color: #666;
-    margin: 5px 5px 0 5px;
-    font-size: 10px;
+  color: var(--text-muted);
+  margin: 0 var(--space-sm);
+  font-size: 10px;
 }
 
+.loader {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Text areas */
 #responseOutput,
 #xpathOutput {
-    width: 100%;
-    padding: 6px;
-    margin-top: 5px;
-    margin-left: 5px;
-    margin-right: 5px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-family: monospace;
-    cursor: pointer;
-    background-color: #444;
-    color: #f0f0f0;
-    transition: border-color 0.3s ease;
-    font-size: 10px;
+  width: 100%;
+  padding: var(--space-md);
+  margin: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-family: monospace;
+  cursor: pointer;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: border-color 0.3s ease;
+  font-size: 12px;
+  box-sizing: border-box;
 }
 
 #responseOutput {
-    height: 100px;
-    resize: vertical;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+  height: 100px;
+  resize: vertical;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 #responseOutput:focus,
 #xpathOutput:focus {
-    outline: none;
-    border-color: #007bff;
+  outline: none;
+  border-color: var(--accent-primary);
 }
 
+/* States */
 .error {
-    color: #dc3545;
-    border-color: #dc3545;
+  color: var(--error-color);
+  border-color: var(--error-color);
 }
 
 .success {
-    border-color: #28a745;
-}
-
-.container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-}
-
-.container button {
-    width: auto;
-}
-
-.loader {
-    font-size: 12px;
-    color: #666;
+  border-color: var(--success-color);
 }

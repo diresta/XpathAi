@@ -1,69 +1,101 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // DOM Elements
     const statusElem = document.getElementById('status');
     const responseOutput = document.getElementById('responseOutput');
     const xpathOutput = document.getElementById('xpathOutput');
     const selectElementButton = document.getElementById('selectElement');
     const settingsButton = document.getElementById('openSettings');
-
-    // Обновление интерфейса
+    const checkUniquenessButton = document.getElementById('checkUniqueness');
+    const clearButton = document.getElementById('clear');
+    
+    // Constants
+    const STATUS = {
+        INACTIVE: 'Не активно',
+        SELECTING: 'Выбор элемента...',
+        COPIED: 'XPath скопирован в буфер обмена!',
+        COPY_FAILED: 'Не удалось скопировать XPath.',
+        STORAGE_ERROR: 'Ошибка при получении данных из хранилища.'
+    };
+    
+    // Helper functions
+    const setElementState = (element, value, isError = false) => {
+        element.value = value;
+        element.classList.toggle('error', isError);
+        element.classList.toggle('success', !isError && value);
+    };
+    
     const updateUI = () => {
-        chrome.storage.local.get(['status', 'response', 'xpath', 'error'], (data) => {
+        chrome.storage.local.get(['status', 'response', 'xpath', 'error', 'duplicates'], (data) => {
             if (chrome.runtime.lastError) {
-                statusElem.textContent = 'Ошибка при получении данных из хранилища.';
-                responseOutput.value = '';
-                responseOutput.classList.remove('error');
-                responseOutput.classList.remove('success');
-                xpathOutput.value = '';
-                xpathOutput.classList.remove('error');
-                xpathOutput.classList.remove('success');
+                statusElem.textContent = STATUS.STORAGE_ERROR;
+                setElementState(responseOutput, '');
+                setElementState(xpathOutput, '');
                 return;
             }
-            statusElem.textContent = `Статус: ${data.status || 'Не активно'}`;
             
-            if (data.response) {
-                responseOutput.value = data.response;
-                responseOutput.classList.add('success');
+            statusElem.textContent = `Статус: ${data.status || STATUS.INACTIVE}`;
+            
+            // Update response output
+            setElementState(responseOutput, data.response || '', !data.response);
+            
+            // Update XPath output
+            if (data.xpath) {
+                setElementState(xpathOutput, data.xpath);
+            } else if (data.error) {
+                setElementState(xpathOutput, `Ошибка: ${data.error}`, true);
             } else {
-                responseOutput.value = '';
-                xpathOutput.classList.add('error');
+                setElementState(xpathOutput, '');
             }
 
-            if (data.xpath) {
-                xpathOutput.value = data.xpath;
-                xpathOutput.classList.remove('error');
-                xpathOutput.classList.add('success');
-            } else if (data.error) {
-                xpathOutput.value = `Ошибка: ${data.error}`;
-                xpathOutput.classList.remove('success');
-                xpathOutput.classList.add('error');
-            } else {
-                xpathOutput.value = '';
-                xpathOutput.classList.remove('error');
-                xpathOutput.classList.remove('success');
+            if (typeof data.duplicates === 'number') {
+                statusElem.textContent += ` | Дубликаты: ${data.duplicates}`;
             }
         });
     };
 
-    // Первоначальное обновление
+    // Initialize UI and listen for changes
     updateUI();
+    chrome.storage.onChanged.addListener(updateUI);
 
-    // Обработчик кнопки выбора элемента
+    // Event handlers
     selectElementButton.addEventListener('click', async () => {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        chrome.storage.local.set({ status: 'Выбор элемента...' });
-        console.log("Sending initSelection message");
-        chrome.runtime.sendMessage({ type: "initSelection", tabId: tab.id });
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tab) {
+                throw new Error('No active tab found');
+            }
+            
+            chrome.storage.local.set({ status: STATUS.SELECTING });
+            chrome.runtime.sendMessage({ type: "initSelection", tabId: tab.id });
+        } catch (error) {
+            console.error('Error initiating selection:', error);
+            statusElem.textContent = `Error: ${error.message}`;
+        }
     });
-
-    // Копирование XPath в буфер обмена
+    
+    clearButton.addEventListener('click', () => {
+        setElementState(responseOutput, '');
+        setElementState(xpathOutput, '');
+        
+        chrome.storage.local.set({
+            status: STATUS.INACTIVE,
+            response: '',
+            xpath: '',
+            error: '',
+            duplicates: 0
+        });
+        
+        statusElem.textContent = `Статус: ${STATUS.INACTIVE}`;
+    });
+    
     xpathOutput.addEventListener('click', () => {
         if (xpathOutput.value) {
             navigator.clipboard.writeText(xpathOutput.value)
                 .then(() => {
-                    statusElem.textContent = 'XPath скопирован в буфер обмена!';
+                    statusElem.textContent = STATUS.COPIED;
                 })
                 .catch(() => {
-                    statusElem.textContent = 'Не удалось скопировать XPath.';
+                    statusElem.textContent = STATUS.COPY_FAILED;
                 });
         }
     });
@@ -72,5 +104,24 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.runtime.openOptionsPage();
     });
 
-    chrome.storage.onChanged.addListener(updateUI);
+    checkUniquenessButton.addEventListener('click', async () => {
+        try {
+            const currentXpath = xpathOutput.value;
+            if (!currentXpath) return;
+            
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tab) {
+                throw new Error('No active tab found');
+            }
+            
+            statusElem.textContent = 'Проверка уникальности...';
+            chrome.tabs.sendMessage(tab.id, {
+                type: "checkXpathUniqueness",
+                xpath: currentXpath
+            });
+        } catch (error) {
+            console.error('Error checking uniqueness:', error);
+            statusElem.textContent = `Error: ${error.message}`;
+        }
+    });
 });
