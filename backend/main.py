@@ -2,11 +2,10 @@ import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 from lxml import html, etree
 from lxml.etree import XMLSyntaxError, XPathEvalError
 import logging
-from dotenv import load_dotenv
-import os
 
 # python -m venv .venv
 # .\.venv\Scripts\activate
@@ -16,15 +15,28 @@ import os
 
 logging.basicConfig(level=logging.DEBUG)
 
-app = FastAPI()
+class Settings(BaseSettings):
+    api_url: str
+    api_key: str
+    model_name: str
+    max_prompt_length: int = 70000
+    request_timeout: int = 60
+    prompt_template_file: str = "prompt_template2.txt"
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
 
-load_dotenv()
-API_URL = os.getenv("API_URL")
-API_KEY = os.getenv("API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME")
-MAX_PROMPT_LENGTH=70000
-REQUEST_TIMEOUT=60
-PROMPT_TEMPLATE_FILE="prompt_template2.txt"
+# Load settings from environment variables
+settings = Settings()
+
+class ElementData(BaseModel):
+    dom: str
+    element: dict
+    context: dict = None
+    use_ai: bool = False
+
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,12 +45,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-class ElementData(BaseModel):
-    dom: str
-    element: dict
-    context: dict = None
-    use_ai: bool = False
 
 def clean_dom(dom: str) -> str:
     """Clean the DOM from unwanted elements and attributes."""
@@ -64,13 +70,13 @@ def generate_prompt(element: dict, dom: str) -> str:
 #    attrs = {attr['name']: attr['value'] for attr in element.get("attributes", [])}
 #    attributes_str = " ".join([f'@{k}="{v}"' for k, v in attrs.items()])
     
-    with open(PROMPT_TEMPLATE_FILE, "r", encoding="utf-8") as file:
+    with open(settings.prompt_template_file, "r", encoding="utf-8") as file:
         template = file.read()
     prompt = template.format(element=element.get('html'), dom=dom)
 
-    if len(prompt) > MAX_PROMPT_LENGTH:
-        logging.warning(f"Prompt length {len(prompt)} exceeds MAX_PROMPT_LENGTH ({MAX_PROMPT_LENGTH}). Truncating.")
-        final_prompt = prompt[:MAX_PROMPT_LENGTH]
+    if len(prompt) > settings.max_prompt_length:
+        logging.warning(f"Prompt length {len(prompt)} exceeds MAX_PROMPT_LENGTH ({settings.max_prompt_length}). Truncating.")
+        final_prompt = prompt[:settings.max_prompt_length]
     else:
         final_prompt = prompt
 
@@ -79,12 +85,12 @@ def generate_prompt(element: dict, dom: str) -> str:
 async def call_model_api(prompt: str) -> str:
     """Calls the AI model API to generate XPath."""
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {settings.api_key}",
         "Content-Type": "application/json",
         "Accept": "application/json"
     }
     payload = {
-        "model": MODEL_NAME,
+        "model": settings.model_name,
         "messages": [{"role": "user", "content": prompt}],
         "stream": False,
         "max_tokens": 512,
@@ -98,8 +104,8 @@ async def call_model_api(prompt: str) -> str:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-            response = await client.post(API_URL, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
+            response = await client.post(settings.api_url, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
@@ -160,8 +166,7 @@ async def generate_xpath(data: ElementData):
             raise HTTPException(status_code=400, detail="Invalid value for use_ai. It must be a boolean.")
         
         prompt = generate_prompt(data.element, cleaned_dom)
-        logging.debug(f"Prompt to deliver: {len(prompt)} context, {prompt}")
-
+        logging.debug(f"Prompt to deliver {len(prompt)} context, first 3000: {prompt[:3000]}")
         response = ""
         if use_ai:
             try:
