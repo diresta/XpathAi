@@ -6,8 +6,8 @@
 - **extension/**
   - `contentScript.js` – код для подсветки и выбора элементов
   - `background.js` – фоновый скрипт для отправки данных на сервер
-  - `popup/` – интерфейс расширения
-  - `options.html`, `options.js`, `options.css` – настройки расширения
+  - `popup/popup.*` – интерфейс расширения
+  - `options.*` – настройки расширения
 
 - **backend/**
   - `main.py` – FastAPI для генерации XPath
@@ -33,22 +33,47 @@ API_URL=<URL AI сервиса>
 API_KEY=<API ключ>
 MODEL_NAME=<Название модели>
 ```
-Тестировалось на:
+Пример конфигурации в `.env.example`
+
+Тестировалось и приемлемо работало на:
 - THUDM/glm-4-9b-chat
 - deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
 - Qwen/Qwen2.5-Coder-7B-Instruct
 
 ## Запуск бэкенда в Docker
 
+Используйте готовые скрипты:
+
+- Linux/macOS/Git Bash:
+   ```bash
+   cd backend
+   chmod +x start_backend_docker.sh
+   ./start_backend_docker.sh
+   ```
+- Windows: backend/start_backend_docker.cmd
+
+Запуск вручную:
+
 1. Убедитесь, что установлен Docker и docker-compose.  
-2. Убедитесь, что в корне проекта есть файл `.env`.  
+2. Убедитесь, что в в папке `backend` есть файл `.env`.  
 3. Запустите:
    ```bash
-   docker-compose build
-   docker-compose up -d
+   docker compose up -d --build
    ```
 
 ## Запуск бэкенда локально (в venv)
+
+Используйте готовые скрипты:
+
+- Linux/macOS/Git Bash:
+   ```bash
+   cd backend
+   chmod +x start_backend_venv.sh
+   ./start_backend_venv.sh
+   ```
+- Windows: backend/start_backend_venv.cmd
+
+Запуск вручную:
 
 1. Убедитесь, что в корне проекта есть файл `.env`.
 2. Создайте виртуальное окружение и активируйте его:
