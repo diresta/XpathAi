@@ -1,5 +1,5 @@
 @echo off
-:: filepath: /c:/Users/dires/Documents/repos/XPathAi/backend/start_backend_venv.cmd
+:: filepath: XPathAi/backend/start_backend_venv.cmd
 
 title XPathAi Backend venv Starter
 

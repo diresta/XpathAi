@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings
 from lxml import html, etree
 from lxml.etree import XMLSyntaxError, XPathEvalError
 import logging
+from functools import lru_cache
 
 # python -m venv .venv
 # .\.venv\Scripts\activate
@@ -82,6 +83,10 @@ def generate_prompt(element: dict, dom: str) -> str:
 
     return final_prompt
 
+@lru_cache()
+def get_httpx_client():
+    return httpx.AsyncClient(timeout=settings.request_timeout, limits=httpx.Limits(max_connections=20))
+
 async def call_model_api(prompt: str) -> str:
     """Calls the AI model API to generate XPath."""
     headers = {
@@ -104,11 +109,11 @@ async def call_model_api(prompt: str) -> str:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout) as client:
-            response = await client.post(settings.api_url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"].strip()
+        client = get_httpx_client()
+        response = await client.post(settings.api_url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"].strip()
     except (httpx.RequestError, IndexError, KeyError) as e:
         logging.error(f"API Error: {str(e)}")
         raise HTTPException(status_code=502, detail="Error calling AI service")
@@ -185,3 +190,8 @@ async def generate_xpath(data: ElementData):
     except Exception as e:
         logging.error(f"Unexpected error: {str(e)} | element: {data.element} | use_ai: {use_ai}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/health")
+async def health_check():
+    """Simple health check endpoint."""
+    return {"status": "ok"}
