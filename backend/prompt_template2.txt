@@ -4,11 +4,24 @@ Inputs:
 1. A string representing the HTML element for which the XPath is to be created.
 2. A string representing the part or entire DOM.
 
-Output: A string representing the unique XPath for the given HTML element.
+Output Format:
+1. Primary XPath: [The most reliable XPath]
+2. Alternative XPath: [A secondary approach if available]
+3. Explanation: [Brief reasoning for your approach]
+4. Verification: [How this XPath uniquely identifies the element]
 
+Selection Priority Framework (highest to lowest):
+1. Testing attributes: data-testid, data-cy, data-qa
+2. Semantic identifiers: id, name, unique aria-* attributes
+3. Content-based: unique text content using normalize-space()
+4. Relative position: relationship to uniquely identifiable siblings/parents
+5. Tag + multiple attributes: combination of element type with multiple attribute conditions
+6. Last resort: structural position (only when UI structure is guaranteed stable)
+
+Rules:
 1. Attribute Priority
 Use: id, name, data-testid, aria-*, role, type, placeholder.
-Avoid : style, indexes (e.g., div[3]), absolute paths (e.g., /html/body/div).
+Avoid: style, indexes (e.g., div[3]), absolute paths (e.g., /html/body/div).
 Example: //input[@id="search"] instead of //div[2]/form/input[1].
 
 2. Handling Text & Dynamic Values
@@ -19,7 +32,8 @@ Dynamic classes/IDs: //div[contains(@class, "button-")] or //div[starts-with(@id
 3. Combine Conditions
 Filter with and/or: //a[@href="/cart" and @role="button"].
 
-4. Navigation with Axes Child elements: //form//input (nested via //).
+4. Navigation with Axes
+Child elements: //form//input (nested via //).
 Siblings/Relatives: //label[.="Email"]/following-sibling::input.
 
 5. Lists & Tables
@@ -32,6 +46,15 @@ By row content: //tr[td[text()="Admin"]]/td[3].
 7. Test-Friendly Selectors
 Custom attributes: //*[@data-qa="login-button"].
 Unique combinations: //button[@aria-label="Close" and @title="Close modal"].
+
+Performance Considerations:
+- Prefer direct attribute selection over text-based selection when possible.
+- Avoid using complex contains() functions when exact matches can work.
+
+Edge Case Handling:
+- If multiple elements match your initial selector, refine it using additional attributes or relationships.
+- If the element has no unique identifiers, create a relative path using nearby elements with stable attributes.
+- If the element appears to be in Shadow DOM, indicate this limitation in your explanation.
 
 Bad: //div[@class='header']/div[2]	
 Good: //nav[@aria-label="Main menu"]
@@ -46,7 +69,15 @@ Key Principles:
 3. Clarity: Avoid overly complex paths; split into smaller queries if needed.
 4. Testability: Prefer attributes added explicitly for testing (e.g., data-testid).
 
+Example Response:
+For input: <button data-action="save" class="btn-primary">Save Changes</button>
+
+Primary XPath: //button[@data-action="save"]
+Alternative XPath: //button[normalize-space()="Save Changes"]
+Explanation: Selected data-action attribute as it's a stable identifier for this element's function.
+Verification: This XPath uniquely identifies the save button regardless of CSS changes.
+
 Goal: Minimize maintenance by making selectors resilient to UI changes.
 
 HTML Element: `{element}` 
-DOM: `{dom}` 
+DOM: `{dom}`

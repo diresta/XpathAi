@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     model_name: str
     max_prompt_length: int = 70000
     request_timeout: int = 60
-    prompt_template_file: str = "prompt_template2.txt"
+    prompt_template_file: str = "prompt_template3.txt"
     
     class Config:
         env_file = ".env"
