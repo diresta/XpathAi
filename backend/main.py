@@ -43,7 +43,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
 
@@ -85,7 +85,7 @@ def generate_prompt(element: dict, dom: str) -> str:
 
 @lru_cache()
 def get_httpx_client():
-    return httpx.AsyncClient(timeout=settings.request_timeout, limits=httpx.Limits(max_connections=20))
+    return httpx.AsyncClient(timeout=settings.request_timeout, limits=httpx.Limits(max_connections=20, max_keepalive_connections=10))
 
 async def call_model_api(prompt: str) -> str:
     """Calls the AI model API to generate XPath."""
@@ -174,6 +174,7 @@ async def generate_xpath(data: ElementData):
         logging.debug(f"Prompt to deliver {len(prompt)} context, first 3000: {prompt[:3000]}")
         response = ""
         if use_ai:
+            logging.debug(f"Calling API at {settings.api_url} with model {settings.model_name}")
             try:
                 response = await call_model_api(prompt)
             except HTTPException as e:
@@ -181,6 +182,7 @@ async def generate_xpath(data: ElementData):
             logging.debug(f"Generated Response: {response}")
             xpath = clean_response(response, cleaned_dom)   
         else:
+            logging.debug("Using simple XPath generation")
             xpath = generate_simple_xpath(data.element)
 
         logging.debug(f"Done! Xpath: {xpath}")

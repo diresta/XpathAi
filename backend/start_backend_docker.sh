@@ -48,7 +48,7 @@ fi
 
 # Build and start the containers
 echo -e "${GREEN}Building and starting Docker containers...${NC}"
-docker compose up --build -d
+sudo docker compose up --build -d
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Failed to start Docker containers.${NC}"
@@ -57,9 +57,9 @@ fi
 
 # Show container status
 echo -e "${GREEN}Container status:${NC}"
-docker compose ps
+sudo docker compose ps
 
 # Show logs 
 echo -e "${GREEN}Container logs (press Ctrl+C to exit logs but keep containers running):${NC}"
 echo -e "${YELLOW}Server will be available at http://localhost:8000${NC}"
-docker compose logs -f
+sudo docker compose logs -f
