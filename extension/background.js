@@ -53,12 +53,16 @@ function handleElementSelected(message, sender) {
 
     chrome.storage.local.set({ status: STATUS.LOADING });
     
-    chrome.storage.sync.get(['useAISetting', 'API_URL'], (config) => {
+    chrome.storage.sync.get(['useAISetting', 'API_URL', 'promptTemplate'], (config) => {
         const apiUrl = (config.API_URL || "http://localhost:80") + "/generate-xpath";
         const requestBody = {
             ...message,
-            use_ai: !!config.useAISetting
+            use_ai: !!config.useAISetting,
+            prompt_template: config.promptTemplate || ""
         };
+        
+        console.log("Sending request with template:", requestBody.prompt_template ? 
+                  `Template length: ${requestBody.prompt_template.length}` : "No template");
         
         fetchWithTimeout(apiUrl, {
             method: "POST",

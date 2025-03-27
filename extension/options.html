@@ -7,13 +7,56 @@
 </head>
 <body>
   <div class="container">
-    <label>AI</label>
-      <input type="checkbox" id="useAI">
-    <label>API URL:
-      <input type="text" id="apiUrl" placeholder="http://localhost:8000" value="http://localhost:8000">
-    </label>
-    <button id="saveBtn">Сохранить</button>
-    <button id="closeSettings">Закрыть</button>
+    <h1>XPathAi Settings</h1>
+    
+    <div class="setting-group">
+      <h2>API Settings</h2>
+      <div class="setting-row">
+        <label for="apiUrl">API URL:</label>
+        <input type="text" id="apiUrl" placeholder="http://localhost:8000" value="http://localhost:8000">
+      </div>
+      
+      <div class="setting-row">
+        <label for="useAI">Use AI for XPath generation:</label>
+        <input type="checkbox" id="useAI">
+      </div>
+    </div>
+    
+    <div class="setting-group">
+      <h2>Prompt Template</h2>
+      <div class="setting-row">
+        <label for="templateSelector">Select Template:</label>
+        <select id="templateSelector">
+          <option value="custom">Custom Template</option>
+          <option value="prompt_template">Basic Template</option>
+          <option value="prompt_template2">Detailed Template</option>
+          <option value="prompt_template3">Concise Template</option>
+        </select>
+      </div>
+      
+      <div class="template-info">
+        <div id="template1-info" class="template-description">Basic template with comprehensive rules and examples</div>
+        <div id="template2-info" class="template-description">Detailed template with clear output format and verification</div>
+        <div id="template3-info" class="template-description">Concise template focused on practical XPath generation</div>
+        <div id="custom-info" class="template-description">Your custom template</div>
+      </div>
+      
+      <textarea id="promptTemplate" rows="15" placeholder="Enter your custom prompt template here. Use {element} and {dom} as placeholders."></textarea>
+      
+      <div class="template-help">
+        <p>Format your template using these placeholders:</p>
+        <ul>
+          <li><code>{element}</code> - The HTML element to target</li>
+          <li><code>{dom}</code> - The DOM structure</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="button-group">
+      <button id="saveBtn" class="primary-button">Save Settings</button>
+      <button id="closeSettings">Close</button>
+      <span id="saveStatus"></span>
+    </div>
   </div>
   <script src="options.js"></script>
 </body>

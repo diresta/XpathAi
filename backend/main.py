@@ -7,6 +7,7 @@ from lxml import html, etree
 from lxml.etree import XMLSyntaxError, XPathEvalError
 import logging
 from functools import lru_cache
+from time import time
 
 # python -m venv .venv
 # .\.venv\Scripts\activate
@@ -22,13 +23,12 @@ class Settings(BaseSettings):
     model_name: str
     max_prompt_length: int = 70000
     request_timeout: int = 60
-    prompt_template_file: str = "prompt_template3.txt"
+    prompt_template_file: str = "default_template.txt"
     
     class Config:
         env_file = ".env"
         case_sensitive = False
 
-# Load settings from environment variables
 settings = Settings()
 
 class ElementData(BaseModel):
@@ -36,6 +36,7 @@ class ElementData(BaseModel):
     element: dict
     context: dict = None
     use_ai: bool = False
+    prompt_template: str = None
 
 app = FastAPI()
 
@@ -50,6 +51,11 @@ app.add_middleware(
 def clean_dom(dom: str) -> str:
     """Clean the DOM from unwanted elements and attributes."""
     logging.debug(f"Original DOM size: {len(dom)} characters")
+
+    if len(dom) > 1_000_000: #1MB
+        logging.warning(f"Extremely large DOM received ({len(dom)} chars). Truncating.")
+        dom = dom[:1_000_000]
+        
     try:
         tree = html.fromstring(dom)
     except XMLSyntaxError as e:
@@ -66,21 +72,51 @@ def clean_dom(dom: str) -> str:
         logging.warning(f"Cleaned DOM size exceeds 100KB!")
     return cleaned_dom
 
-def generate_prompt(element: dict, dom: str) -> str:
-    """Generates a prompt for the AI model."""
-#    attrs = {attr['name']: attr['value'] for attr in element.get("attributes", [])}
-#    attributes_str = " ".join([f'@{k}="{v}"' for k, v in attrs.items()])
-    
-    with open(settings.prompt_template_file, "r", encoding="utf-8") as file:
-        template = file.read()
-    prompt = template.format(element=element.get('html'), dom=dom)
+def get_default_template(template_path: str) -> str:
+    try:
+        with open(template_path, "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError:
+        logging.error(f"Template {template_path} not found")
+        return None
 
+def generate_prompt(element: dict, dom: str, prompt_template: str = None) -> str:
+    """Generates a prompt for the AI model."""
+    template = ""
+
+    if prompt_template and ("{element}" in prompt_template or "{dom}" in prompt_template):
+        template = prompt_template
+        logging.debug("Using extension provided prompt template content")
+    
+    #If prompt_template is a filename
+    elif prompt_template and prompt_template.endswith((".txt", ".md")):
+        template = get_template_content(prompt_template)
+        if not template:
+            logging.warning(f"Template file {prompt_template} not found, falling back to default")
+            template = get_template_content(settings.prompt_template_file)
+            logging.debug(f"Using default template from: {settings.prompt_template_file}")
+    else:
+        template = get_template_content(settings.prompt_template_file)
+        if not template:
+            logging.error(f"Default template file {settings.prompt_template_file} not found")
+            template = """
+            Generate an XPath that uniquely identifies this element:
+            {element}
+            
+            Within this DOM:
+            {dom}
+            """
+            logging.debug("Using emergency built-in template")
+    
+    prompt = template.format(element=element.get('html', ''), dom=dom)
+    
+    # Truncate if needed
     if len(prompt) > settings.max_prompt_length:
         logging.warning(f"Prompt length {len(prompt)} exceeds MAX_PROMPT_LENGTH ({settings.max_prompt_length}). Truncating.")
         final_prompt = prompt[:settings.max_prompt_length]
     else:
         final_prompt = prompt
-
+    
     return final_prompt
 
 @lru_cache()
@@ -149,9 +185,9 @@ def clean_response(response: str, cleaned_dom: str) -> str:
     try:
         elements = tree.xpath(cleaned_xpath)
         if not elements:
-            logging.error("XPath not found in DOM", exc_info=True)
+            logging.warning(f"XPath not found in DOM: {cleaned_xpath}")
     except XPathEvalError as e:
-        logging.error("Invalid XPath but whatever", exc_info=True)
+        logging.error(f"Invalid XPath Error: {str(e)} but whatever")
 
     logging.debug(f"Cleaned XPath: {cleaned_xpath}")
 
@@ -160,6 +196,7 @@ def clean_response(response: str, cleaned_dom: str) -> str:
 @app.post("/generate-xpath")
 async def generate_xpath(data: ElementData):
     """Accepts DOM and element data, calls API for XPath generation or uses simple generation."""
+    start = time()
     try:
         if not data.dom.strip():
             raise HTTPException(status_code=400, detail="Empty DOM")
@@ -170,7 +207,7 @@ async def generate_xpath(data: ElementData):
         if not isinstance(use_ai, bool):
             raise HTTPException(status_code=400, detail="Invalid value for use_ai. It must be a boolean.")
         
-        prompt = generate_prompt(data.element, cleaned_dom)
+        prompt = generate_prompt(data.element, cleaned_dom, data.prompt_template)
         logging.debug(f"Prompt to deliver {len(prompt)} context, first 3000: {prompt[:3000]}")
         response = ""
         if use_ai:
@@ -187,6 +224,9 @@ async def generate_xpath(data: ElementData):
 
         logging.debug(f"Done! Xpath: {xpath}")
 
+        execution_time = time() - start
+        logging.info(f"XPath generation completed in {execution_time:.2f}s (AI={use_ai})")
+        
         return {"response": response, "xpath": xpath}
     
     except Exception as e:

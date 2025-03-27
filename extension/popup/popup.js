@@ -61,12 +61,16 @@ document.addEventListener('DOMContentLoaded', () => {
     selectElementButton.addEventListener('click', async () => {
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (!tab) {
-                throw new Error('No active tab found');
-            }
-            
-            chrome.storage.local.set({ status: STATUS.SELECTING });
-            chrome.runtime.sendMessage({ type: "initSelection", tabId: tab.id });
+            if (!tab) throw new Error('No active tab found');
+
+            chrome.storage.sync.get(['promptTemplate'], (data) => {
+                const promptTemplate = data.promptTemplate || '';
+                chrome.runtime.sendMessage({
+                    type: "initSelection",
+                    tabId: tab.id,
+                    promptTemplate: promptTemplate
+                });
+            });
         } catch (error) {
             console.error('Error initiating selection:', error);
             statusElem.textContent = `Error: ${error.message}`;
