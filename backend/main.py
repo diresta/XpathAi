@@ -80,23 +80,16 @@ def get_default_template(template_path: str) -> str:
         logging.error(f"Template {template_path} not found")
         return None
 
-def generate_prompt(element: dict, dom: str, prompt_template: str = None) -> str:
+def generate_prompt(data: ElementData) -> str:
     """Generates a prompt for the AI model."""
     template = ""
 
-    if prompt_template and ("{element}" in prompt_template or "{dom}" in prompt_template):
-        template = prompt_template
+    if data.prompt_template and ("{element}" in data.prompt_template or "{dom}" in data.prompt_template):
+        template = data.prompt_template
         logging.debug("Using extension provided prompt template content")
-    
-    #If prompt_template is a filename
-    elif prompt_template and prompt_template.endswith((".txt", ".md")):
-        template = get_template_content(prompt_template)
-        if not template:
-            logging.warning(f"Template file {prompt_template} not found, falling back to default")
-            template = get_template_content(settings.prompt_template_file)
-            logging.debug(f"Using default template from: {settings.prompt_template_file}")
     else:
-        template = get_template_content(settings.prompt_template_file)
+        logging.debug("Using extension provided prompt template content")
+        template = get_default_template(settings.prompt_template_file)
         if not template:
             logging.error(f"Default template file {settings.prompt_template_file} not found")
             template = """
@@ -108,7 +101,8 @@ def generate_prompt(element: dict, dom: str, prompt_template: str = None) -> str
             """
             logging.debug("Using emergency built-in template")
     
-    prompt = template.format(element=element.get('html', ''), dom=dom)
+    cleaned_dom = clean_dom(data.dom)
+    prompt = template.format(element=data.element.get('html', ''), dom=cleaned_dom)
     
     # Truncate if needed
     if len(prompt) > settings.max_prompt_length:
@@ -165,7 +159,7 @@ def generate_simple_xpath(element: dict) -> str:
             break
     return "".join(xpath_parts)
 
-def clean_response(response: str, cleaned_dom: str) -> str:
+def clean_response(response: str, dom: str) -> str:
     """Return only the XPath from the response, removing any code fences and explanations."""
     lines = response.replace("```", "").splitlines()
     cleaned_xpath = ""
@@ -181,7 +175,7 @@ def clean_response(response: str, cleaned_dom: str) -> str:
     if not cleaned_xpath:
         cleaned_xpath = response.strip()
 
-    tree = html.fromstring(cleaned_dom)
+    tree = html.fromstring(dom)
     try:
         elements = tree.xpath(cleaned_xpath)
         if not elements:
@@ -201,14 +195,13 @@ async def generate_xpath(data: ElementData):
         if not data.dom.strip():
             raise HTTPException(status_code=400, detail="Empty DOM")
 
-        cleaned_dom = clean_dom(data.dom)
-        use_ai = data.use_ai
+        prompt = generate_prompt(data)
+        logging.debug(f"Prompt to deliver {len(prompt)} context, first 5000: {prompt[:5000]}")
 
+        use_ai = data.use_ai
         if not isinstance(use_ai, bool):
             raise HTTPException(status_code=400, detail="Invalid value for use_ai. It must be a boolean.")
         
-        prompt = generate_prompt(data.element, cleaned_dom, data.prompt_template)
-        logging.debug(f"Prompt to deliver {len(prompt)} context, first 3000: {prompt[:3000]}")
         response = ""
         if use_ai:
             logging.debug(f"Calling API at {settings.api_url} with model {settings.model_name}")
@@ -217,7 +210,7 @@ async def generate_xpath(data: ElementData):
             except HTTPException as e:
                 raise e
             logging.debug(f"Generated Response: {response}")
-            xpath = clean_response(response, cleaned_dom)   
+            xpath = clean_response(response, data.dom)   
         else:
             logging.debug("Using simple XPath generation")
             xpath = generate_simple_xpath(data.element)
