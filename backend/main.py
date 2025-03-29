@@ -1,4 +1,5 @@
 import httpx
+import re
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -159,33 +160,62 @@ def generate_simple_xpath(element: dict) -> str:
             break
     return "".join(xpath_parts)
 
-def clean_response(response: str, dom: str) -> str:
-    """Return only the XPath from the response, removing any code fences and explanations."""
-    lines = response.replace("```", "").splitlines()
-    cleaned_xpath = ""
-    for line in lines:
-        line = line.strip()
-        if line.startswith("//") or line.startswith(".//"):
-            cleaned_xpath = line
-            break
-        elif "**XPath:**" in line:
-            raw_xpath = line.split("**XPath:**", 1)[1].strip().strip("`")
-            cleaned_xpath = raw_xpath
-            break
-    if not cleaned_xpath:
-        cleaned_xpath = response.strip()
-
+def clean_response(response: str, dom: str) -> dict:
+    result = {
+        "primary_xpath": "",
+        "alternative_xpath": None,
+        "explanation": None
+    }
+    
+    primary_match = re.search(r"1\.?\s*(?:Primary|Main)\s*XPath:?\s*([^\n]+)", response, re.IGNORECASE)
+    alt_match = re.search(r"2\.?\s*(?:Alternative|Secondary)\s*XPath:?\s*([^\n]+)", response, re.IGNORECASE)
+    explanation_match = re.search(r"3\.?\s*(?:Brief explanation|Explanation|Approach)[^:]*:?\s*(.*?)(?=\n\d\.|\Z)", response, re.DOTALL | re.IGNORECASE)
+    
+    if primary_match:
+        primary_xpath = primary_match.group(1).strip().strip('`').strip()
+        result["primary_xpath"] = primary_xpath
+        
+        if alt_match:
+            alt_xpath = alt_match.group(1).strip().strip('`').strip()
+            result["alternative_xpath"] = alt_xpath
+        
+        if explanation_match:
+            explanation = explanation_match.group(1).strip()
+            result["explanation"] = explanation
+    else:
+        lines = response.replace("```", "").splitlines()
+        for line in lines:
+            line = line.strip()
+            if line.startswith("//") or line.startswith(".//"):
+                result["primary_xpath"] = line
+                break
+            elif "**XPath:**" in line:
+                raw_xpath = line.split("**XPath:**", 1)[1].strip().strip("`")
+                result["primary_xpath"] = raw_xpath
+                break
+        if not result["primary_xpath"]:
+            result["primary_xpath"] = response.strip()
+    
     tree = html.fromstring(dom)
     try:
-        elements = tree.xpath(cleaned_xpath)
+        elements = tree.xpath(result["primary_xpath"])
         if not elements:
-            logging.warning(f"XPath not found in DOM: {cleaned_xpath}")
+            logging.warning(f"Primary XPath not found in DOM: {result['primary_xpath']}")
     except XPathEvalError as e:
-        logging.error(f"Invalid XPath Error: {str(e)} but whatever")
-
-    logging.debug(f"Cleaned XPath: {cleaned_xpath}")
-
-    return cleaned_xpath
+        logging.error(f"Invalid primary XPath: {str(e)}")
+    
+    if result["alternative_xpath"]:
+        try:
+            elements = tree.xpath(result["alternative_xpath"])
+            if not elements:
+                logging.warning(f"Alternative XPath not found in DOM: {result['alternative_xpath']}")
+        except XPathEvalError as e:
+            logging.error(f"Invalid alternative XPath: {str(e)}")
+    
+    logging.debug(f"Parsed XPaths - Primary: {result['primary_xpath']}, " + 
+                  f"Alternative: {result['alternative_xpath']}")
+    
+    return result
 
 @app.post("/generate-xpath")
 async def generate_xpath(data: ElementData):
@@ -202,7 +232,6 @@ async def generate_xpath(data: ElementData):
         if not isinstance(use_ai, bool):
             raise HTTPException(status_code=400, detail="Invalid value for use_ai. It must be a boolean.")
         
-        response = ""
         if use_ai:
             logging.debug(f"Calling API at {settings.api_url} with model {settings.model_name}")
             try:
@@ -210,17 +239,30 @@ async def generate_xpath(data: ElementData):
             except HTTPException as e:
                 raise e
             logging.debug(f"Generated Response: {response}")
-            xpath = clean_response(response, data.dom)   
+            xpath_data = clean_response(response, data.dom)
+            
+            execution_time = time() - start
+            logging.info(f"XPath generation completed in {execution_time:.2f}s (AI={use_ai})")
+            
+            return {
+                "response": response,
+                "xpath": xpath_data["primary_xpath"],
+                "alternative_xpath": xpath_data["alternative_xpath"],
+                "explanation": xpath_data["explanation"]
+            }
         else:
             logging.debug("Using simple XPath generation")
             xpath = generate_simple_xpath(data.element)
-
-        logging.debug(f"Done! Xpath: {xpath}")
-
-        execution_time = time() - start
-        logging.info(f"XPath generation completed in {execution_time:.2f}s (AI={use_ai})")
-        
-        return {"response": response, "xpath": xpath}
+            
+            execution_time = time() - start
+            logging.info(f"XPath generation completed in {execution_time:.2f}s (AI={use_ai})")
+            
+            return {
+                "response": "",
+                "xpath": xpath,
+                "alternative_xpath": None,
+                "explanation": None
+            }
     
     except Exception as e:
         logging.error(f"Unexpected error: {str(e)} | element: {data.element} | use_ai: {use_ai}", exc_info=True)

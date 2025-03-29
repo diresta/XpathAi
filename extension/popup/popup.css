@@ -1,5 +1,4 @@
 :root {
-  /* Color palette */
   --bg-primary: #2d2d2d;
   --bg-secondary: #444;
   --text-primary: #f0f0f0;
@@ -11,7 +10,6 @@
   --success-color: #28a745;
   --error-color: #dc3545;
   
-  /* Spacing */
   --space-xs: 4px;
   --space-sm: 5px;
   --space-md: 8px;
@@ -29,7 +27,6 @@ body {
   position: relative;
 }
 
-/* Layout components */
 .header {
   display: flex;
   justify-content: space-between;
@@ -47,9 +44,11 @@ body {
   flex-direction: column;
   align-items: center;
   gap: var(--space-sm);
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-sm);
 }
 
-/* Buttons */
 button {
   padding: 6px var(--space-lg);
   background: var(--accent-primary);
@@ -89,7 +88,6 @@ button:hover {
   color: var(--accent-hover);
 }
 
-/* Status and messages */
 #status {
   color: var(--text-muted);
   margin: 0 var(--space-sm);
@@ -101,12 +99,13 @@ button:hover {
   color: var(--text-muted);
 }
 
-/* Text areas */
 #responseOutput,
-#xpathOutput {
+#primaryXpathOutput,
+#alternativeXpathOutput {
   width: 100%;
   padding: var(--space-md);
-  margin: var(--space-sm);
+  margin: 0;
+  margin-bottom: 10px;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   font-family: monospace;
@@ -131,7 +130,6 @@ button:hover {
   border-color: var(--accent-primary);
 }
 
-/* States */
 .error {
   color: var(--error-color);
   border-color: var(--error-color);
@@ -139,4 +137,98 @@ button:hover {
 
 .success {
   border-color: var(--success-color);
+}
+
+.explanation-section {
+    margin: 10px 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-secondary);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.explanation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 4px 4px 0 0;
+}
+
+.explanation-header button {
+    background: none;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    color: #555;
+    padding: 0;
+}
+
+.explanation-content {
+    padding: 8px 12px;
+    font-size: 13px;
+    line-height: 1.4;
+    max-height: 100px;
+    overflow-y: auto;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 0 0 4px 4px;
+    color: var(--text-primary);
+}
+
+.explanation-content.collapsed {
+    display: none;
+}
+
+.xpath-section {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+}
+
+.xpath-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.xpath-tabs {
+    display: none;
+}
+
+.xpath-tab {
+    display: none;
+}
+
+.xpath-tab.active {
+    border-bottom-color: #4285f4;
+    color: #4285f4;
+    font-weight: 500;
+}
+
+.xpath-tab.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#copyXpath {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+}
+
+#explanationSection, .alternative-header, #alternativeXpathOutput {
+    display: none;
+}
+
+.alternative-header {
+    margin-top: 10px;
 }

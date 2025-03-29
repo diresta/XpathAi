@@ -26,23 +26,40 @@ function init() {
     isInitialized = true;
     setupHighlightStyles();
 
-    chrome.runtime.onMessage.addListener((message) => {
-        try {
-            switch (message.type) {
-                case "activateSelection":
-                    activateSelection();
-                    break;
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        switch(message.type) {
+            case "activateSelection":
+                activateSelection();
+                break;
+                
+            case "checkXpathUniqueness":
+                try {
+                    const xpath = message.xpath;
+                    if (!xpath) return;
                     
-                case "checkXpathUniqueness":
-                    const duplicates = evaluateXpathCount(message.xpath);
-                    chrome.runtime.sendMessage({ 
-                        type: "xpathUniquenessResult", 
-                        duplicates 
+                    const matchedElements = document.evaluate(
+                        xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null
+                    );
+                    
+                    const count = matchedElements.snapshotLength;
+                    
+                    for (let i = 0; i < count; i++) {
+                        const element = matchedElements.snapshotItem(i);
+                        element.classList.add('xpath-helper-match');
+                        
+                        setTimeout(() => {
+                            element.classList.remove('xpath-helper-match');
+                        }, 2000);
+                    }
+                    
+                    chrome.runtime.sendMessage({
+                        type: "xpathUniquenessResult",
+                        duplicates: count
                     });
-                    break;
-            }
-        } catch (error) {
-            console.error("Error handling message:", message.type, error);
+                } catch (e) {
+                    console.error('Error evaluating XPath:', e);
+                }
+                break;
         }
     });
 }

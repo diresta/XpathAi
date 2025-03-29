@@ -14,8 +14,23 @@
         <button id="openSettings">⚙️</button>
     </div>
     <div class="container">
-        <textarea id="responseOutput" readonly placeholder="sample text"></textarea>
-        <input type="text" id="xpathOutput" readonly placeholder="sample text">
+        <div class="xpath-section">
+            <div class="xpath-header">
+                <span>Основной XPath</span>
+            </div>
+            <input type="text" id="primaryXpathOutput" readonly class="xpath-field" placeholder="Основной XPath будет здесь">
+            <div class="xpath-header alternative-header">
+                <span>Альтернативный XPath</span>
+            </div>
+            <input type="text" id="alternativeXpathOutput" readonly class="xpath-field" placeholder="Альтернативный XPath будет здесь">
+        </div>
+        <div class="explanation-section" id="explanationSection">
+            <div class="explanation-header">
+                <span>Объяснение решения</span>
+                <button id="toggleExplanation">▼</button>
+            </div>
+            <div class="explanation-content" id="explanationContent"></div>
+        </div>        
         <button id="checkUniqueness">🦄 Проверить дубликаты</button>
         <div id="status">Статус: Не активно</div>
     </div>

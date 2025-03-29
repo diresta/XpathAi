@@ -1,14 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // DOM Elements
     const statusElem = document.getElementById('status');
-    const responseOutput = document.getElementById('responseOutput');
-    const xpathOutput = document.getElementById('xpathOutput');
+    const primaryXpathOutput = document.getElementById('primaryXpathOutput');
+    const alternativeXpathOutput = document.getElementById('alternativeXpathOutput');
     const selectElementButton = document.getElementById('selectElement');
     const settingsButton = document.getElementById('openSettings');
     const checkUniquenessButton = document.getElementById('checkUniqueness');
     const clearButton = document.getElementById('clear');
     
-    // Constants
+    const explanationContent = document.getElementById('explanationContent');
+    const toggleExplanationBtn = document.getElementById('toggleExplanation');
+    const explanationSection = document.getElementById('explanationSection');
+    const alternativeHeader = document.querySelector('.alternative-header');
+    
     const STATUS = {
         INACTIVE: 'Не активно',
         SELECTING: 'Выбор элемента...',
@@ -17,34 +20,90 @@ document.addEventListener('DOMContentLoaded', () => {
         STORAGE_ERROR: 'Ошибка при получении данных из хранилища.'
     };
     
-    // Helper functions
     const setElementState = (element, value, isError = false) => {
         element.value = value;
         element.classList.toggle('error', isError);
         element.classList.toggle('success', !isError && value);
     };
     
+    primaryXpathOutput.addEventListener('click', () => {
+        if (primaryXpathOutput.value) {
+            navigator.clipboard.writeText(primaryXpathOutput.value)
+                .then(() => {
+                    statusElem.textContent = STATUS.COPIED;
+                    flashElement(primaryXpathOutput);
+                })
+                .catch(() => {
+                    statusElem.textContent = STATUS.COPY_FAILED;
+                });
+        }
+    });
+
+    alternativeXpathOutput.addEventListener('click', () => {
+        if (alternativeXpathOutput.value) {
+            navigator.clipboard.writeText(alternativeXpathOutput.value)
+                .then(() => {
+                    statusElem.textContent = STATUS.COPIED;
+                    flashElement(alternativeXpathOutput);
+                })
+                .catch(() => {
+                    statusElem.textContent = STATUS.COPY_FAILED;
+                });
+        }
+    });
+    
+    function flashElement(element) {
+        element.classList.add('copied');
+        setTimeout(() => {
+            element.classList.remove('copied');
+        }, 300);
+    }
+    
+    toggleExplanationBtn.addEventListener('click', () => {
+        const isCollapsed = explanationContent.classList.toggle('collapsed');
+        toggleExplanationBtn.textContent = isCollapsed ? '▼' : '▲';
+    });
+    
+    alternativeHeader.style.display = 'none';
+    alternativeXpathOutput.style.display = 'none';
+    explanationSection.style.display = 'none';
+
     const updateUI = () => {
-        chrome.storage.local.get(['status', 'response', 'xpath', 'error', 'duplicates'], (data) => {
+        chrome.storage.local.get([
+            'status', 'response', 'xpath', 'error', 
+            'duplicates', 'alternativeXpath', 'explanation'
+        ], (data) => {
             if (chrome.runtime.lastError) {
                 statusElem.textContent = STATUS.STORAGE_ERROR;
-                setElementState(responseOutput, '');
-                setElementState(xpathOutput, '');
+                setElementState(primaryXpathOutput, '');
+                setElementState(alternativeXpathOutput, '');
                 return;
             }
             
             statusElem.textContent = `Статус: ${data.status || STATUS.INACTIVE}`;
             
-            // Update response output
-            setElementState(responseOutput, data.response || '', !data.response);
+            console.log("UI Update with data:", data);
             
-            // Update XPath output
-            if (data.xpath) {
-                setElementState(xpathOutput, data.xpath);
-            } else if (data.error) {
-                setElementState(xpathOutput, `Ошибка: ${data.error}`, true);
+            setElementState(primaryXpathOutput, data.xpath || '', !!data.error);
+            
+            if (data.alternativeXpath) {
+                alternativeHeader.style.display = 'block';
+                alternativeXpathOutput.style.display = 'block';
+                setElementState(alternativeXpathOutput, data.alternativeXpath, false);
             } else {
-                setElementState(xpathOutput, '');
+                alternativeHeader.style.display = 'none';
+                alternativeXpathOutput.style.display = 'none';
+            }
+            
+            if (data.explanation) {
+                explanationContent.textContent = data.explanation;
+                explanationSection.style.display = 'block';
+            } else {
+                explanationSection.style.display = 'none';
+            }
+            
+            if (data.error) {
+                setElementState(primaryXpathOutput, `Ошибка: ${data.error}`, true);
             }
 
             if (typeof data.duplicates === 'number') {
@@ -78,30 +137,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     clearButton.addEventListener('click', () => {
-        setElementState(responseOutput, '');
-        setElementState(xpathOutput, '');
+        setElementState(primaryXpathOutput, '');
+        setElementState(alternativeXpathOutput, '');
         
         chrome.storage.local.set({
             status: STATUS.INACTIVE,
             response: '',
             xpath: '',
+            alternativeXpath: null,
+            explanation: null,
             error: '',
             duplicates: 0
         });
         
         statusElem.textContent = `Статус: ${STATUS.INACTIVE}`;
-    });
-    
-    xpathOutput.addEventListener('click', () => {
-        if (xpathOutput.value) {
-            navigator.clipboard.writeText(xpathOutput.value)
-                .then(() => {
-                    statusElem.textContent = STATUS.COPIED;
-                })
-                .catch(() => {
-                    statusElem.textContent = STATUS.COPY_FAILED;
-                });
-        }
+        alternativeHeader.style.display = 'none';
+        alternativeXpathOutput.style.display = 'none';
+        explanationSection.style.display = 'none';
     });
 
     settingsButton.addEventListener('click', () => {
@@ -110,8 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     checkUniquenessButton.addEventListener('click', async () => {
         try {
-            const currentXpath = xpathOutput.value;
-            if (!currentXpath) return;
+            const xpathToCheck = primaryXpathOutput.value;
+            if (!xpathToCheck) return;
             
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab) {
@@ -121,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             statusElem.textContent = 'Проверка уникальности...';
             chrome.tabs.sendMessage(tab.id, {
                 type: "checkXpathUniqueness",
-                xpath: currentXpath
+                xpath: xpathToCheck
             });
         } catch (error) {
             console.error('Error checking uniqueness:', error);

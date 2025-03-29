@@ -76,11 +76,21 @@ function handleElementSelected(message, sender) {
             return response.json();
         })
         .then(data => {
+            console.log("Received response from server:", data);
+            
             chrome.storage.local.set({ 
                 status: STATUS.COMPLETE,
                 response: data.response,
                 xpath: data.xpath,
+                alternativeXpath: data.alternative_xpath || null,
+                explanation: data.explanation || null,
                 error: null
+            }, () => {
+                console.log("Data saved to storage:", {
+                    xpath: data.xpath,
+                    alternativeXpath: data.alternative_xpath,
+                    explanation: data.explanation
+                });
             });
             
             if (data.xpath) {
