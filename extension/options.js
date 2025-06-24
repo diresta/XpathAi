@@ -1,106 +1,82 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  const useAI = document.getElementById('useAI');
-  const apiUrl = document.getElementById('apiUrl');
-  const promptTemplate = document.getElementById('promptTemplate');
-  const templateSelector = document.getElementById('templateSelector');
-  const saveBtn = document.getElementById('saveBtn');
-  const closeBtn = document.getElementById('closeSettings');
-  const saveStatus = document.getElementById('saveStatus');
-  
-  // Template descriptions
-  const templateDescriptions = {
-    'prompt_template': document.getElementById('template1-info'),
-    'prompt_template2': document.getElementById('template2-info'),
-    'prompt_template3': document.getElementById('template3-info'),
-    'custom': document.getElementById('custom-info')
-  };
-  
-  // Load templates
-  const templates = {};
-  const templateFiles = ['prompt_template', 'prompt_template2', 'prompt_template3'];
-  
-  try {
-    await Promise.all(templateFiles.map(async (name) => {
-      const response = await fetch(chrome.runtime.getURL(`templates/${name}.txt`));
-      if (response.ok) {
-        templates[name] = await response.text();
-      } else {
-        console.error(`Failed to load template: ${name}`);
-      }
-    }));
-  } catch (error) {
-    console.error("Error loading templates:", error);
-  }
-  
-  // Update description visibility on template selection change
-  function updateTemplateDescription(selectedTemplate) {
-    // Hide all descriptions first
-    Object.values(templateDescriptions).forEach(desc => {
-      desc.style.display = 'none';
+document.addEventListener('DOMContentLoaded', () => {
+    const apiServiceUrlInput = document.getElementById('apiServiceUrl');
+    const apiKeyInput = document.getElementById('apiKey');
+    const modelNameInput = document.getElementById('modelName');
+    const maxPromptLengthInput = document.getElementById('maxPromptLength');
+    const requestTimeoutInput = document.getElementById('requestTimeout');
+    const defaultPromptTemplateTextarea = document.getElementById('defaultPromptTemplate');
+    const saveButton = document.getElementById('saveSettings');
+    const statusDiv = document.getElementById('status');
+
+    const defaultTemplateValue = `Generate an XPath that uniquely identifies this element:
+{element}
+
+Within this DOM:
+{dom}
+
+Please provide your response as a JSON object with the following keys:
+- "primary_xpath": (string) The most reliable XPath.
+- "alternative_xpath": (string | null) A backup XPath, or null if not applicable.
+- "explanation": (string) A brief explanation of why this approach was chosen.
+Ensure the output is a single, valid JSON object only.`;
+
+    // Load saved settings
+    chrome.storage.sync.get([
+        'apiServiceUrl', 
+        'apiKey', 
+        'modelName',
+        'maxPromptLength',
+        'requestTimeout',
+        'defaultPromptTemplate'
+    ], (settings) => {
+        if (chrome.runtime.lastError) {
+            console.error("Error loading settings:", chrome.runtime.lastError);
+            statusDiv.textContent = 'Error loading settings.';
+            statusDiv.style.color = 'red';
+        }
+        apiServiceUrlInput.value = settings.apiServiceUrl || '';
+        apiKeyInput.value = settings.apiKey || '';
+        modelNameInput.value = settings.modelName || 'gpt-4';
+        maxPromptLengthInput.value = settings.maxPromptLength || 10000;
+        requestTimeoutInput.value = settings.requestTimeout || 60;
+        defaultPromptTemplateTextarea.value = settings.defaultPromptTemplate || defaultTemplateValue;
     });
-    
-    // Show selected template description
-    if (templateDescriptions[selectedTemplate]) {
-      templateDescriptions[selectedTemplate].style.display = 'block';
-    }
-  }
-  
-  // Load saved settings
-  chrome.storage.sync.get(['useAISetting', 'API_URL', 'promptTemplate', 'selectedTemplate'], (data) => {
-    useAI.checked = !!data.useAISetting;
-    apiUrl.value = data.API_URL || 'http://localhost:8000';
-    
-    // Set selected template
-    const selectedTemplate = data.selectedTemplate || 'prompt_template3';
-    templateSelector.value = selectedTemplate;
-    
-    // Set template content
-    if (selectedTemplate === 'custom' && data.promptTemplate) {
-      promptTemplate.value = data.promptTemplate;
-    } else if (templates[selectedTemplate]) {
-      promptTemplate.value = templates[selectedTemplate];
-    }
-    
-    updateTemplateDescription(selectedTemplate);
-  });
-  
-  // Handle template selection
-  templateSelector.addEventListener('change', () => {
-    const selectedTemplate = templateSelector.value;
-    
-    if (selectedTemplate !== 'custom') {
-      if (templates[selectedTemplate]) {
-        promptTemplate.value = templates[selectedTemplate];
-      }
-    }
-    
-    updateTemplateDescription(selectedTemplate);
-  });
-  
-  // Save settings
-  saveBtn.addEventListener('click', () => {
-    const selectedTemplate = templateSelector.value;
-    
-    chrome.storage.sync.set({
-      useAISetting: useAI.checked,
-      API_URL: apiUrl.value,
-      promptTemplate: promptTemplate.value,
-      selectedTemplate: selectedTemplate
-    }, () => {
-      saveStatus.textContent = 'Settings saved!';
-      saveStatus.style.opacity = 1;
-      
-      setTimeout(() => {
-        saveStatus.style.opacity = 0;
-      }, 2000);
+
+    // Save settings
+    saveButton.addEventListener('click', () => {
+        const settingsToSave = {
+            apiServiceUrl: apiServiceUrlInput.value.trim(),
+            apiKey: apiKeyInput.value.trim(), // API key is saved directly
+            modelName: modelNameInput.value.trim(),
+            maxPromptLength: parseInt(maxPromptLengthInput.value, 10) || 70000,
+            requestTimeout: parseInt(requestTimeoutInput.value, 10) || 60,
+            defaultPromptTemplate: defaultPromptTemplateTextarea.value.trim() || defaultTemplateValue
+        };
+
+        if (!settingsToSave.apiServiceUrl) {
+            statusDiv.textContent = 'API Service URL is required.';
+            statusDiv.style.color = 'red';
+            return;
+        }
+        if (!settingsToSave.apiKey) {
+            statusDiv.textContent = 'API Key is required.';
+            statusDiv.style.color = 'red';
+            return;
+        }
+
+
+        chrome.storage.sync.set(settingsToSave, () => {
+            if (chrome.runtime.lastError) {
+                console.error("Error saving settings:", chrome.runtime.lastError);
+                statusDiv.textContent = 'Error saving settings.';
+                statusDiv.style.color = 'red';
+            } else {
+                statusDiv.textContent = 'Settings saved!';
+                statusDiv.style.color = 'green';
+                setTimeout(() => {
+                    statusDiv.textContent = '';
+                }, 3000);
+            }
+        });
     });
-  });
-  
-  // Close settings
-  closeBtn.addEventListener('click', () => {
-    window.close();
-  });
-  
-  // Initial description update
-  updateTemplateDescription(templateSelector.value);
 });

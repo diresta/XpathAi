@@ -6,58 +6,41 @@
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <div class="container">
-    <h1>XPathAi Settings</h1>
-    
-    <div class="setting-group">
-      <h2>API Settings</h2>
-      <div class="setting-row">
-        <label for="apiUrl">API URL:</label>
-        <input type="text" id="apiUrl" placeholder="http://localhost:8000" value="http://localhost:8000">
-      </div>
-      
-      <div class="setting-row">
-        <label for="useAI">Use AI for XPath generation:</label>
-        <input type="checkbox" id="useAI">
-      </div>
+    <div class="field-group">
+        <label for="apiServiceUrl">AI Service API URL:</label>
+        <input type="url" id="apiServiceUrl" placeholder="e.g., https://api.openai.com/v1/chat/completions">
     </div>
     
-    <div class="setting-group">
-      <h2>Prompt Template</h2>
-      <div class="setting-row">
-        <label for="templateSelector">Select Template:</label>
-        <select id="templateSelector">
-          <option value="custom">Custom Template</option>
-          <option value="prompt_template">Basic Template</option>
-          <option value="prompt_template2">Detailed Template</option>
-          <option value="prompt_template3">Concise Template</option>
-        </select>
-      </div>
-      
-      <div class="template-info">
-        <div id="template1-info" class="template-description">Basic template with comprehensive rules and examples</div>
-        <div id="template2-info" class="template-description">Detailed template with clear output format and verification</div>
-        <div id="template3-info" class="template-description">Concise template focused on practical XPath generation</div>
-        <div id="custom-info" class="template-description">Your custom template</div>
-      </div>
-      
-      <textarea id="promptTemplate" rows="15" placeholder="Enter your custom prompt template here. Use {element} and {dom} as placeholders."></textarea>
-      
-      <div class="template-help">
-        <p>Format your template using these placeholders:</p>
-        <ul>
-          <li><code>{element}</code> - The HTML element to target</li>
-          <li><code>{dom}</code> - The DOM structure</li>
-        </ul>
-      </div>
+    <div class="field-group">
+        <label for="apiKey">API Key:</label>
+        <input type="password" id="apiKey" placeholder="Your AI service API key">
+        <p class="note">Note: API keys are stored in your browser's local storage. Use keys with appropriate restrictions if possible.</p>
     </div>
     
-    <div class="button-group">
-      <button id="saveBtn" class="primary-button">Save Settings</button>
-      <button id="closeSettings">Close</button>
-      <span id="saveStatus"></span>
+    <div class="field-group">
+        <label for="modelName">Model Name:</label>
+        <input type="text" id="modelName" placeholder="e.g., gpt-3.5-turbo">
     </div>
-  </div>
-  <script src="options.js"></script>
+
+    <div class="field-group">
+        <label for="maxPromptLength">Max Prompt Length (characters):</label>
+        <input type="number" id="maxPromptLength" value="70000">
+    </div>
+
+    <div class="field-group">
+        <label for="requestTimeout">Request Timeout (seconds):</label>
+        <input type="number" id="requestTimeout" value="60">
+    </div>
+
+    <div class="field-group">
+        <label for="defaultPromptTemplate">Default Prompt Template:</label>
+        <textarea id="defaultPromptTemplate" rows="10" style="width: 90%;"></textarea>
+        <p class="note">Use {element} for the selected element's HTML and {dom} for the cleaned page DOM.</p>
+    </div>
+
+    <button id="saveSettings">Save Settings</button>
+    <div id="status"></div>
+
+    <script src="options.js"></script>
 </body>
 </html>

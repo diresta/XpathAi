@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleExplanationBtn = document.getElementById('toggleExplanation');
     const explanationSection = document.getElementById('explanationSection');
     const alternativeHeader = document.querySelector('.alternative-header');
-    
+    const useAIButton = document.getElementById('useAI');
+
     const STATUS = {
         INACTIVE: 'Не активно',
         SELECTING: 'Выбор элемента...',
@@ -122,13 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab) throw new Error('No active tab found');
 
-            chrome.storage.sync.get(['promptTemplate'], (data) => {
-                const promptTemplate = data.promptTemplate || '';
-                chrome.runtime.sendMessage({
-                    type: "initSelection",
-                    tabId: tab.id,
-                    promptTemplate: promptTemplate
-                });
+            chrome.runtime.sendMessage({
+                type: "initSelection", 
+                tabId: tab.id
             });
         } catch (error) {
             console.error('Error initiating selection:', error);
@@ -180,4 +177,55 @@ document.addEventListener('DOMContentLoaded', () => {
             statusElem.textContent = `Error: ${error.message}`;
         }
     });
+    
+    // Message listener for XPath generation response
+    chrome.runtime.onMessage.addListener((message) => {
+        if (message.action === "generateXPathResponse") {
+            const { xpath, alternativeXpath, explanation, error, useAI } = message;
+            
+            setElementState(primaryXpathOutput, xpath || '', !!error);
+            
+            if (alternativeXpath) {
+                alternativeHeader.style.display = 'block';
+                alternativeXpathOutput.style.display = 'block';
+                setElementState(alternativeXpathOutput, alternativeXpath, false);
+            } else {
+                alternativeHeader.style.display = 'none';
+                alternativeXpathOutput.style.display = 'none';
+            }
+            
+            if (explanation) {
+                explanationContent.textContent = explanation;
+                explanationSection.style.display = 'block';
+            } else {
+                explanationSection.style.display = 'none';
+            }
+            
+            if (error) {
+                setElementState(primaryXpathOutput, `Ошибка: ${error}`, true);
+            }
+
+            if (useAI) {
+                statusElem.textContent += ' | Использован ИИ для генерации XPath';
+            }
+            else {
+                statusElem.textContent += ' | XPath сгенерирован без ИИ';
+            }
+
+            if (typeof message.duplicates === 'number') {
+                statusElem.textContent += ` | Дубликаты: ${message.duplicates}`;
+            }
+        }
+    });
+    
+    // Send message to background script to generate XPath
+    function generateXPath(useAI) {
+        chrome.runtime.sendMessage({
+            action: "generateXPath",
+            useAI: useAI
+        });
+    }
+    
+    // Example of how to call generateXPath with AI flag
+    // generateXPath(useAICheckbox.checked);
 });
