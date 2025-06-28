@@ -23,7 +23,7 @@ Ensure the output is a single, valid JSON object only.`
 // Load settings from storage when the extension starts or when settings change
 async function loadSettings() {
     try {
-        const loadedSettings = await chrome.storage.sync.get(Object.keys(settings));
+        const loadedSettings = await chrome.storage.local.get(Object.keys(settings));
         settings = { ...settings, ...loadedSettings };
         console.log("XPath AI: Settings loaded/updated", settings);
     } catch (e) {
@@ -36,7 +36,7 @@ loadSettings();
 
 // Listen for changes in settings and update
 chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'sync') {
+    if (namespace === 'local') {
         console.log("XPath AI: Detected settings change, reloading.");
         loadSettings();
     }

@@ -91,7 +91,7 @@ Ensure the output is a single, valid JSON object only.`
     });
 
     function loadSettings() {
-        chrome.storage.sync.get([
+        chrome.storage.local.get([
             'apiServiceUrl', 
             'apiKey', 
             'modelName',
@@ -161,16 +161,19 @@ Ensure the output is a single, valid JSON object only.`
             return;
         }
 
-        chrome.storage.sync.set(settingsToSave, () => {
+        chrome.storage.local.set(settingsToSave, () => {
             if (chrome.runtime.lastError) {
                 console.error("Error saving settings:", chrome.runtime.lastError);
                 statusDiv.textContent = 'Ошибка сохранения настроек.';
-                statusDiv.style.color = 'red';
+                statusDiv.classList.remove('success');
+                statusDiv.classList.add('error');
             } else {
                 statusDiv.textContent = 'Настройки сохранены!';
-                statusDiv.style.color = 'green';
+                statusDiv.classList.remove('error');
+                statusDiv.classList.add('success');
                 setTimeout(() => {
                     statusDiv.textContent = '';
+                    statusDiv.classList.remove('success');
                 }, 3000);
             }
         });
