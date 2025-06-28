@@ -8,7 +8,7 @@
 <body>
     <div class="header">
         <div class="button-group">
-            <button id="selectElement">🔍 Выбрать</button>
+            <button id="selectElement">🔍</button>
             <button id="clear">🔄️</button>
             <button id="useAI">🤖</button>
         </div>
@@ -17,22 +17,22 @@
     <div class="container">
         <div class="xpath-section">
             <div class="xpath-header">
-                <span>Основной XPath</span>
+                <span>XPath</span>
             </div>
             <input type="text" id="primaryXpathOutput" readonly class="xpath-field" placeholder="Основной XPath будет здесь">
             <div class="xpath-header alternative-header">
-                <span>Альтернативный XPath</span>
+                <span>alt. XPath</span>
             </div>
-            <input type="text" id="alternativeXpathOutput" readonly class="xpath-field" placeholder="Альтернативный XPath будет здесь">
+            <input type="text" id="alternativeXpathOutput" readonly class="xpath-field">
         </div>
         <div class="explanation-section" id="explanationSection">
             <div class="explanation-header">
-                <span>Объяснение решения</span>
+                <span>Объяснение</span>
                 <button id="toggleExplanation">▼</button>
             </div>
             <div class="explanation-content" id="explanationContent"></div>
         </div>        
-        <button id="checkUniqueness">🦄 Проверить дубликаты</button>
+        <button id="checkUniqueness">🦄 Поиск дублей</button>
         <div id="status">Статус: Не активно</div>
     </div>
     <script src="popup.js"></script>
