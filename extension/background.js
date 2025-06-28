@@ -166,7 +166,7 @@ function generatePromptForAI(domString, elementData, promptTemplateOverride) {
             availableDomLength = 0; // Should not happen if template is reasonable
         }
 
-        const truncatedDom = cleanedDom.length > availableDomLength 
+        const truncatedDom = domString.length > availableDomLength 
             ? cleanedDom.substring(0, availableDomLength) + "... (DOM truncated)"
             : cleanedDom;
 
@@ -180,7 +180,7 @@ function generatePromptForAI(domString, elementData, promptTemplateOverride) {
         console.log(`XPath AI: Truncated prompt length: ${prompt.length}`);
     }
     
-    console.log("XPath AI: Generated prompt (first 500 chars):", prompt.substring(0,500));
+    console.log("XPath AI: Generated prompt (first 500 chars): ", prompt.substring(0,500));
     return prompt;
 }
 
