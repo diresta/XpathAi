@@ -5,7 +5,11 @@ You are an experienced web developer with a deep understanding of XPath and DOM 
 2. A string representing the part or entire DOM.
 
 ### Output:
-A string representing the unique XPath for the given HTML element.
+Please provide your response as a JSON object with the following keys:
+- "primary_xpath": (string) The most reliable XPath.
+- "alternative_xpath": (string) A backup XPath, or "" if not applicable.
+- "explanation": (string) A brief explanation of why this approach was chosen, or "" if not applicable.
+**IMPORTANT**: Return ONLY the JSON object in your response. Do NOT wrap it in markdown code blocks (```json or ```). Do NOT include any additional text, explanations, or formatting. The response must be a valid JSON object that can be parsed directly.
 
 ### Rules:
 1. Prefer unique attributes: id, data-id, class, alt, title, name, etc.

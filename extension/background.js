@@ -17,7 +17,7 @@ Please provide your response as a JSON object with the following keys:
 - "primary_xpath": (string) The most reliable XPath.
 - "alternative_xpath": (string | null) A backup XPath, or null if not applicable.
 - "explanation": (string) A brief explanation of why this approach was chosen.
-Ensure the output is a single, valid JSON object only.`
+**IMPORTANT**: Return ONLY the JSON object in your response. Do NOT wrap it in markdown code blocks (\`\`\`json or \`\`\`). Do NOT include any additional text, explanations, or formatting. The response must be a valid JSON object that can be parsed directly.`
 };
 
 // Load settings from storage when the extension starts or when settings change
@@ -193,12 +193,18 @@ async function callAIModelAPI(prompt) {
     const payload = {
         model: settings.modelName,
         messages: [{ role: "user", content: prompt }],
-        // stream: false, 
-        // max_tokens: 1024,
-        // temperature: 0.5,
+        stream: false,
+        max_tokens: 512,
+        stop: ["null"],
+        temperature: 0.7,
+        top_p: 0.7,
+        top_k: 50,
+        frequency_penalty: 0.5,
+        n: 1,
+        response_format: {"type": "text"}
     };
 
-    console.log("XPath AI: Sending request to AI API:", settings.apiServiceUrl, "Payload (preview):", JSON.stringify(payload).substring(0, 200));
+    console.log("XPath AI: Sending request to AI API:", settings.apiServiceUrl, "Headers:" ,JSON.stringify(headers), "Payload (preview):", JSON.stringify(payload).substring(0, 200));
     console.time("XPath AI: AI API Call");
 
     try {
@@ -225,7 +231,7 @@ async function callAIModelAPI(prompt) {
         }
 
         const responseData = await response.json();
-        //console.log("XPath AI: AI API Full Response:", responseData);
+        console.log("XPath AI: AI API Full Response:", responseData);
 
         // Extract content - this is highly dependent on the API provider's response structure
         let aiGeneratedText = "";
@@ -256,7 +262,8 @@ async function callAIModelAPI(prompt) {
                 console.log("XPath AI: Fallback extraction found text:", aiGeneratedText.substring(0,100) + "...");
             }
         }
-        
+
+        console.log("XPath AI: AI Generated Text full:", aiGeneratedText);
         return aiGeneratedText.trim();
 
     } catch (error) {
@@ -269,135 +276,109 @@ async function callAIModelAPI(prompt) {
     }
 }
 
-// Renamed original parser to be used as a fallback
-function parseAIResponseWithRegex(responseText, domString) {
-    console.log("XPath AI: Parsing AI Response with regex (first 300 chars):", responseText.substring(0,300));
-    const result = {
-        originalResponse: responseText,
-        primary_xpath: "",
-        alternative_xpath: null,
-        explanation: null
-    };
-
-    const primaryMatch = responseText.match(/1\.?\s*(?:Primary|Main)\s*XPath:?\s*([^\n`]+)/i);
-    const altMatch = responseText.match(/2\.?\s*(?:Alternative|Secondary)\s*XPath:?\s*([^\n`]+)/i);
-    const explanationMatch = responseText.match(/(?:3\.?\s*(?:Brief explanation|Explanation|Approach)[^:]*:?|Explanation:)\s*([\s\S]*?)(?=\n\s*(?:\d\.|<!--|$)|\Z)/i);
-
-    if (primaryMatch && primaryMatch[1]) {
-        result.primary_xpath = primaryMatch[1].trim().replace(/^[`"']+|[`"']+$/g, '').trim();
-        
-        if (altMatch && altMatch[1]) {
-            result.alternative_xpath = altMatch[1].trim().replace(/^[`"']+|[`"']+$/g, '').trim();
-        }
-        
-        if (explanationMatch && explanationMatch[1]) {
-            result.explanation = explanationMatch[1].trim();
-        }
-    } else {
-        // Fallback: try to find XPath-like strings if no structured response
-        const lines = responseText.replace(/```(?:xpath|xml|html)?/g, "").split('\n');
-        let foundXpath = null;
-        for (const line of lines) {
-            const trimmedLine = line.trim().replace(/^[`"']+|[`"']+$/g, '').trim();
-            if ((trimmedLine.startsWith("//") || trimmedLine.startsWith(".//") || trimmedLine.startsWith("(/")) && trimmedLine.length > 5) {
-                if (!trimmedLine.includes(" ") || trimmedLine.includes("[")) {
-                    foundXpath = trimmedLine;
-                    break;
-                }
-            }
-            const mdXpathMatch = trimmedLine.match(/\*\*XPath:\*\*\s*([^\n`]+)/i);
-            if (mdXpathMatch && mdXpathMatch[1]) {
-                foundXpath = mdXpathMatch[1].trim().replace(/^[`"']+|[`"']+$/g, '').trim();
-                break;
-            }
-        }
-        if (foundXpath) {
-            result.primary_xpath = foundXpath;
-        } else {
-            // Last resort: if response is short and seems like an XPath, use it.
-            // Or use the first non-empty line.
-            const firstNonEmptyLine = lines.find(line => line.trim().length > 0);
-            if (responseText.length < 200 && (responseText.startsWith("//") || responseText.startsWith(".//"))) {
-                 result.primary_xpath = responseText.trim().replace(/^[`"']+|[`"']+$/g, '').trim();
-            } else if (firstNonEmptyLine) {
-                result.primary_xpath = firstNonEmptyLine.trim().replace(/^[`"']+|[`"']+$/g, '').trim();
-            } else {
-                 result.primary_xpath = responseText.trim().replace(/^[`"']+|[`"']+$/g, '').trim(); // Default to the whole response
-            }
-            console.warn("XPath AI: Could not parse structured XPath. Fallback XPath:", result.primary_xpath);
-        }
-        // Try to get an explanation if not found with primary XPath
-        if (!result.explanation && explanationMatch && explanationMatch[1]) {
-             result.explanation = explanationMatch[1].trim();
-        } else if (!result.explanation) {
-            // If no structured explanation, try to find a line starting with "Explanation:" or similar
-            const explLines = responseText.split('\n');
-            for(const line of explLines) {
-                if (line.toLowerCase().startsWith("explanation:") || line.toLowerCase().startsWith("approach:")) {
-                    result.explanation = line.substring(line.indexOf(":") + 1).trim();
-                    break;
-                }
-            }
-        }
-    }
-    
-    if (!result.primary_xpath && responseText.length > 0) {
-        console.warn("XPath AI: Primary XPath is empty after parsing. Using the original response as a fallback if it looks like an XPath.");
-        if (responseText.startsWith("//") || responseText.startsWith(".//") || responseText.startsWith("(/")) {
-            result.primary_xpath = responseText.trim().replace(/^[`"']+|[`"']+$/g, '').trim();
-        }
-    }
-    
-    console.log("XPath AI: Parsed AI Response data:", result);
-    return result;
-}
-
 function parseAIResponse(responseText, domString) {
-    console.log("XPath AI: Attempting to parse AI Response. Raw (first 300 chars):", responseText.substring(0,300));
+    console.log("XPath AI: Attempting to parse AI Response. Raw (first 1000 chars):", responseText.substring(0,1000));
     try {
-        // Attempt to find a JSON block if the response isn't pure JSON (e.g., wrapped in ```json ... ```
-        const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
-        let jsonStringToParse = responseText;
+        let jsonStringToParse = responseText.trim();
+        // First, try to extract JSON from markdown code blocks
+        // Handle both complete and incomplete (truncated) code blocks
+        const codeBlockPatterns = [
+            // Complete code blocks
+            { pattern: /```json\s*\n?([\s\S]*?)\n?\s*```/i, type: 'complete' },
+            { pattern: /```JSON\s*\n?([\s\S]*?)\n?\s*```/, type: 'complete' },
+            { pattern: /```\s*\n?([\s\S]*?)\n?\s*```/, type: 'complete' },
+            // Incomplete/truncated code blocks
+            { pattern: /```json\s*\n?([\s\S]*)$/i, type: 'truncated' },
+            { pattern: /```JSON\s*\n?([\s\S]*)$/i, type: 'truncated' },
+            { pattern: /```\s*\n?([\s\S]*)$/, type: 'truncated' }
+        ];
 
-        if (jsonMatch && jsonMatch[1]) {
-            jsonStringToParse = jsonMatch[1].trim();
-            console.log("XPath AI: Extracted JSON block from markdown code block.");
-        } else {
-            // If no markdown block, try to find the first '{' and last '}' to extract a potential JSON object
-            // This helps if the AI includes any prefix/suffix text around the JSON.
+        let foundInCodeBlock = false;
+        for (const { pattern, type } of codeBlockPatterns) {
+            const match = responseText.match(pattern);
+            if (match && match[1]) {
+                const extracted = match[1].trim();
+                console.log(`XPath AI: Extracted candidate from ${type} code block:`, extracted.substring(0, 100) + "...");
+                // Verify it looks like JSON (starts with { and contains expected keys)
+                if (extracted.startsWith('{') && (extracted.includes('"primary_xpath"') || extracted.includes("'primary_xpath'"))) {
+                    jsonStringToParse = extracted;
+                    console.log(`XPath AI: Successfully extracted JSON from ${type} markdown code block using pattern:`, pattern.source);
+                    foundInCodeBlock = true;
+                    break;
+                } else {
+                    console.log(`XPath AI: Extracted text from ${type} block doesn't look like valid JSON, trying next pattern...`);
+                }
+            }
+        }
+
+        // Additional cleanup: remove any remaining markdown artifacts
+        jsonStringToParse = jsonStringToParse
+            .replace(/^```[a-zA-Z]*\s*\n?/, '')  // Remove opening ```language
+            .replace(/\n?\s*```$/, '')           // Remove closing ```
+            .trim();
+
+        // If no code block found, try to find JSON by braces
+        if (!foundInCodeBlock) {
+            console.log("XPath AI: No code block found, searching for JSON by braces...");
             const firstBrace = responseText.indexOf('{');
             const lastBrace = responseText.lastIndexOf('}');
             if (firstBrace !== -1 && lastBrace > firstBrace) {
-                jsonStringToParse = responseText.substring(firstBrace, lastBrace + 1);
-                console.log("XPath AI: Extracted potential JSON substring from response.");
+                const potentialJson = responseText.substring(firstBrace, lastBrace + 1);
+                console.log("XPath AI: Found potential JSON by braces:", potentialJson.substring(0, 100) + "...");
+                // Only use if it contains expected JSON structure
+                if (potentialJson.includes('"primary_xpath"') || potentialJson.includes("'primary_xpath'")) {
+                    jsonStringToParse = potentialJson;
+                    console.log("XPath AI: Using JSON found by braces extraction.");
+                }
             }
         }
         
-        const jsonData = JSON.parse(jsonStringToParse);
+        // Log what we're about to parse for debugging
+        console.log("XPath AI: About to parse JSON string (first 500 chars):", jsonStringToParse.substring(0, 500));
+        
+        // Additional validation before parsing
+        if (!jsonStringToParse.trim().startsWith('{')) {
+            console.warn("XPath AI: JSON string doesn't start with '{'. Full string:", jsonStringToParse);
+            throw new Error("Extracted text is not valid JSON format");
+        }
+
+        let jsonData = JSON.parse(jsonStringToParse);
 
         const { primary_xpath, alternative_xpath, explanation } = jsonData;
 
         if (!primary_xpath || typeof primary_xpath !== 'string') {
             console.error("XPath AI: AI response JSON missing or invalid 'primary_xpath'.", jsonData);
-            // If primary_xpath is missing from JSON, it's a critical failure for JSON parsing path.
-            // Fallback to regex might be better here.
             throw new Error("AI response JSON missing or invalid 'primary_xpath'.");
         }
 
         const result = {
-            originalResponse: responseText, // Still store the original full response
+            originalResponse: responseText,
             primary_xpath: primary_xpath.trim(),
             alternative_xpath: (alternative_xpath && typeof alternative_xpath === 'string') ? alternative_xpath.trim() : null,
             explanation: (explanation && typeof explanation === 'string') ? explanation.trim() : "No explanation provided in JSON."
         };
+
+        if (!result.primary_xpath && responseText.length > 0) {
+            console.warn("XPath AI: Primary XPath is empty after parsing. Using the original response as a fallback if it looks like an XPath.");
+            if (responseText.startsWith("//") || responseText.startsWith(".//") || responseText.startsWith("(/")) {
+                result.primary_xpath = responseText.trim().replace(/^[`"']+|[`"']+$/g, '').trim();
+            }
+        }
+
         console.log("XPath AI: Successfully parsed AI JSON Response data:", result);
         return result;
 
     } catch (error) {
-        console.warn("XPath AI: Failed to parse AI response as JSON. Error:", error.message, "Will attempt regex-based parsing as fallback.");
-        return parseAIResponseWithRegex(responseText, domString); 
+        console.error("XPath AI: Failed to parse AI response as JSON. Error:", error.message);
+        return {
+            originalResponse: responseText,
+            primary_xpath: "",
+            alternative_xpath: null,
+            explanation: `Failed to parse AI response: ${error.message}`
+        };
     }
 }
+
 
 function generateSimpleXPath(elementData) {
     // elementData is expected to be { tag: 'div', attributes: [{name: 'id', value: 'test'}, ...], html: 'outerHTML' }

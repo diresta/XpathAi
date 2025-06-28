@@ -5,10 +5,11 @@ Inputs:
 2. A string representing the part or entire DOM.
 
 Output Format:
-1. Primary XPath: [The most reliable XPath]
-2. Alternative XPath: [A secondary approach if available]
-3. Explanation: [Brief reasoning for your approach]
-4. Verification: [How this XPath uniquely identifies the element]
+Please provide your response as a JSON object with the following keys:
+- "primary_xpath": (string) The most reliable XPath.
+- "alternative_xpath": (string) A backup XPath, or "" if not applicable.
+- "explanation": (string) A brief explanation of why this approach was chosen, or "" if not applicable.
+**IMPORTANT**: Return ONLY the JSON object in your response. Do NOT wrap it in markdown code blocks (```json or ```). Do NOT include any additional text, explanations, or formatting. The response must be a valid JSON object that can be parsed directly.
 
 Selection Priority Framework (highest to lowest):
 1. Testing attributes: data-testid, data-cy, data-qa
