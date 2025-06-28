@@ -64,3 +64,90 @@
 ## Лицензия
 
 Проект распространяется «как есть». Вносите любые изменения и улучшения по своему усмотрению.
+
+## Схема взаимодействия
+
+### Архитектура компонентов
+```
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
+│   Popup     │◄──►│  Background  │◄──►│  ContentScript  │
+│   (UI)      │    │  (Service    │    │  (Web Page)     │
+│             │    │   Worker)    │    │                 │
+└─────────────┘    └──────────────┘    └─────────────────┘
+       │                   │                     │
+       ▼                   ▼                     ▼
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
+│   Chrome    │    │  AI Service  │    │    DOM Tree     │
+│   Storage   │    │   (External) │    │   (Website)     │
+└─────────────┘    └──────────────┘    └─────────────────┘
+```
+
+### Основные потоки сообщений
+
+#### 1. Активация выбора элемента
+```
+Popup ── action: "initSelection" ──► Background ── action: "activateSelection" ──► ContentScript
+  │                                                                                 │
+  └── tabId, useAI                                                                  └── Активирует режим выбора
+```
+
+#### 2. Генерация XPath
+```
+ContentScript ── action: "generateXPath" ──► Background ──► AI Service (опционально)
+     │                                        │                │
+     └── DOM, element data, useAI             │                └── Генерация XPath
+                                              ▼
+                                        Chrome Storage ◄─── Результат
+                                              │
+                                              ▼
+                                            Popup ◄─── storage.onChanged
+                                              │
+                                              └── Обновление UI
+```
+
+#### 3. Проверка уникальности
+```
+Popup ── action: "checkXpathUniqueness" ──► ContentScript
+  │                                           │
+  └── xpath                                   └── Подсчет элементов
+                                              │
+                                              ▼
+                                        Chrome Storage ◄─── duplicates count
+                                              │
+                                              ▼
+                                            Popup ◄─── storage.onChanged
+```
+
+#### 4. Подсветка дубликатов
+```
+Popup ── action: "highlightDuplicates" ──► ContentScript
+  │                                         │
+  └── xpath                                 └── Подсветка элементов на странице
+```
+
+### Типы сообщений
+
+| Отправитель | Получатель | Тип сообщения | Назначение |
+|-------------|------------|---------------|------------|
+| Popup | Background | `action: "initSelection"` | Активация режима выбора |
+| Background | ContentScript | `action: "activateSelection"` | Запуск выбора элемента |
+| ContentScript | Background | `action: "generateXPath"` | Генерация XPath |
+| Popup | ContentScript | `action: "checkXpathUniqueness"` | Проверка уникальности |
+| Popup | ContentScript | `action: "highlightDuplicates"` | Подсветка дубликатов |
+
+### Хранение данных
+
+**Chrome Storage (local):**
+- `status` - текущий статус операции
+- `xpath` - основной XPath
+- `alternativeXpath` - альтернативный XPath  
+- `explanation` - объяснение генерации (AI)
+- `error` - сообщение об ошибке
+- `duplicates` - количество найденных элементов
+- `isAIEnabled` - состояние AI-режима
+- `apiServiceUrl` - URL AI сервиса
+- `apiKey` - ключ API ⚠️
+- `modelName` - название модели
+- `defaultPromptTemplate` - шаблон промпта
+
+> ⚠️ **Важно**: API ключи хранятся локально в незашифрованном виде. Используйте только тестовые ключи или ключи с ограниченными правами. Не используйте ключи с доступом к критичным данным.
