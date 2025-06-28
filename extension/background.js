@@ -157,7 +157,7 @@ function generatePromptForAI(domString, elementData, promptTemplateOverride) {
         const elementPart = template.substring(0, template.indexOf(domPlaceholder));
         const domPartStructure = template.substring(template.indexOf(domPlaceholder));
         
-        const fixedPartsLength = elementPart.replace(elementPlaceholder, elementHtml).length + 
+        const fixedPartsLength = elementPart.replace(elementPlaceholder, elementData.html).length + 
                                  domPartStructure.replace(domPlaceholder, "").length;
         
         let availableDomLength = settings.maxPromptLength - fixedPartsLength;
@@ -167,10 +167,10 @@ function generatePromptForAI(domString, elementData, promptTemplateOverride) {
         }
 
         const truncatedDom = domString.length > availableDomLength 
-            ? cleanedDom.substring(0, availableDomLength) + "... (DOM truncated)"
-            : cleanedDom;
+            ? domString.substring(0, availableDomLength) + "... (DOM truncated)"
+            : domString;
 
-        prompt = elementPart.replace(elementPlaceholder, elementHtml) + 
+        prompt = elementPart.replace(elementPlaceholder, elementData.html) + 
                  domPartStructure.replace(domPlaceholder, truncatedDom);
         
         // Final check if still too long (e.g. elementHTML is massive)
