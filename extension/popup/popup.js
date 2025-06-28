@@ -100,14 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    useAIButton.addEventListener('click', () => {
-        chrome.storage.local.get('isAIEnabled', (data) => {
-            const newState = !data.isAIEnabled;
-            chrome.storage.local.set({ isAIEnabled: newState }, () => {
-                updateAIButtonState(newState);
-            });
-        });
-    });
+    // Removed duplicate event listener for useAIButton.
     
     function flashElement(element) {
         element.classList.add('copied');
