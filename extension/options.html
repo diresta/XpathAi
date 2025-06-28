@@ -2,43 +2,53 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>XPathAi Settings</title>
+  <title>Настройки XPathAi</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
+    <h2>⚙️ Настройки XPathAi</h2>
     <div class="field-group">
-        <label for="apiServiceUrl">AI Service API URL:</label>
-        <input type="url" id="apiServiceUrl" placeholder="e.g., https://api.openai.com/v1/chat/completions">
+        <label for="apiServiceUrl">API URL сервиса ИИ:</label>
+        <input type="url" id="apiServiceUrl" placeholder="напр, https://api.openai.com/v1/chat/completions">
     </div>
     
     <div class="field-group">
-        <label for="apiKey">API Key:</label>
-        <input type="password" id="apiKey" placeholder="Your AI service API key">
-        <p class="note">Note: API keys are stored in your browser's local storage. Use keys with appropriate restrictions if possible.</p>
+        <label for="apiKey">API ключ:</label>
+        <input type="password" id="apiKey" placeholder="Ваш API ключ сервиса ИИ">
+        <p class="note">API ключи сохраняются в локальном хранилище браузера. По возможности используйте ключи с соответствующими ограничениями.</p>
     </div>
     
     <div class="field-group">
-        <label for="modelName">Model Name:</label>
-        <input type="text" id="modelName" placeholder="e.g., gpt-3.5-turbo">
+        <label for="modelName">Название модели:</label>
+        <input type="text" id="modelName" placeholder="напр, gpt-3.5-turbo">
     </div>
 
     <div class="field-group">
-        <label for="maxPromptLength">Max Prompt Length (characters):</label>
+        <label for="maxPromptLength">Максимальная длина промпта (символов):</label>
         <input type="number" id="maxPromptLength" value="70000">
     </div>
 
     <div class="field-group">
-        <label for="requestTimeout">Request Timeout (seconds):</label>
+        <label for="requestTimeout">Таймаут запроса (секунд):</label>
         <input type="number" id="requestTimeout" value="60">
     </div>
 
     <div class="field-group">
-        <label for="defaultPromptTemplate">Default Prompt Template:</label>
-        <textarea id="defaultPromptTemplate" rows="10" style="width: 90%;"></textarea>
-        <p class="note">Use {element} for the selected element's HTML and {dom} for the cleaned page DOM.</p>
+        <label for="templateSelector">Шаблон промпта:</label>
+        <div class="template-selector-group">
+            <select id="templateSelector">
+                <option value="custom">Пользовательский шаблон</option>
+                <option value="template1">Базовый XPath шаблон</option>
+                <option value="template2">Продвинутый XPath шаблон</option>
+                <option value="template3">Компактный XPath шаблон</option>
+            </select>
+            <div class="template-description" id="templateDescription"></div>
+        </div>
+        <label for="defaultPromptTemplate">Содержимое шаблона промпта:</label>
+        <textarea id="defaultPromptTemplate" rows="15"></textarea>
+        <p class="note">Используйте {element} для HTML выбранного элемента и {dom} для очищенного DOM страницы.</p>
     </div>
-
-    <button id="saveSettings">Save Settings</button>
+    <button id="saveSettings">Сохранить настройки</button>
     <div id="status"></div>
 
     <script src="options.js"></script>

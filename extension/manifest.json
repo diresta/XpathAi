@@ -17,7 +17,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/*", "popup/*", "contentScript.js"],
+      "resources": ["icons/*", "popup/*", "prompts/*", "contentScript.js"],
       "matches": ["<all_urls>"]
     }
   ],  

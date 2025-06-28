@@ -52,30 +52,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    primaryXpathOutput.addEventListener('click', () => {
-        if (primaryXpathOutput.value) {
-            navigator.clipboard.writeText(primaryXpathOutput.value)
+    function handleCopyToClipboard(element) {
+        if (element.value) {
+            navigator.clipboard.writeText(element.value)
                 .then(() => {
                     statusElem.textContent = STATUS.COPIED;
-                    flashElement(primaryXpathOutput);
+                    flashElement(element);
                 })
                 .catch(() => {
                     statusElem.textContent = STATUS.COPY_FAILED;
                 });
         }
+    }
+
+    primaryXpathOutput.addEventListener('click', () => {
+        handleCopyToClipboard(primaryXpathOutput);
     });
 
     alternativeXpathOutput.addEventListener('click', () => {
-        if (alternativeXpathOutput.value) {
-            navigator.clipboard.writeText(alternativeXpathOutput.value)
-                .then(() => {
-                    statusElem.textContent = STATUS.COPIED;
-                    flashElement(alternativeXpathOutput);
-                })
-                .catch(() => {
-                    statusElem.textContent = STATUS.COPY_FAILED;
-                });
-        }
+        handleCopyToClipboard(alternativeXpathOutput);
     });
 
     useAIButton.addEventListener('click', () => {
@@ -87,21 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    alternativeXpathOutput.addEventListener('click', () => {
-        if (alternativeXpathOutput.value) {
-            navigator.clipboard.writeText(alternativeXpathOutput.value)
-                .then(() => {
-                    statusElem.textContent = STATUS.COPIED;
-                    flashElement(alternativeXpathOutput);
-                })
-                .catch(() => {
-                    statusElem.textContent = STATUS.COPY_FAILED;
-                });
-        }
-    });
-
-    // Removed duplicate event listener for useAIButton.
-    
     function flashElement(element) {
         element.classList.add('copied');
         setTimeout(() => {
