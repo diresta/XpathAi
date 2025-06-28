@@ -26,6 +26,31 @@ document.addEventListener('DOMContentLoaded', () => {
         element.classList.toggle('error', isError);
         element.classList.toggle('success', !isError && value);
     };
+
+    const updateAIButtonState = (isAIEnabled) => {
+        useAIButton.classList.toggle('active', isAIEnabled);
+    };
+
+    chrome.storage.local.get('isAIEnabled', (data) => {
+        updateAIButtonState(data.isAIEnabled);
+    });
+    
+    statusElem.addEventListener('click', async () => {
+        const xpath = primaryXpathOutput.value;
+        if (!xpath || xpath.startsWith('Ошибка:')) return;
+
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tab) throw new Error('No active tab found');
+
+            chrome.tabs.sendMessage(tab.id, {
+                type: "highlightDuplicates",
+                xpath: xpath
+            });
+        } catch (error) {
+            console.error('Error highlighting duplicates:', error);
+        }
+    });
     
     primaryXpathOutput.addEventListener('click', () => {
         if (primaryXpathOutput.value) {
@@ -51,6 +76,37 @@ document.addEventListener('DOMContentLoaded', () => {
                     statusElem.textContent = STATUS.COPY_FAILED;
                 });
         }
+    });
+
+    useAIButton.addEventListener('click', () => {
+        chrome.storage.local.get('isAIEnabled', (data) => {
+            const newState = !data.isAIEnabled;
+            chrome.storage.local.set({ isAIEnabled: newState }, () => {
+                updateAIButtonState(newState);
+            });
+        });
+    });
+
+    alternativeXpathOutput.addEventListener('click', () => {
+        if (alternativeXpathOutput.value) {
+            navigator.clipboard.writeText(alternativeXpathOutput.value)
+                .then(() => {
+                    statusElem.textContent = STATUS.COPIED;
+                    flashElement(alternativeXpathOutput);
+                })
+                .catch(() => {
+                    statusElem.textContent = STATUS.COPY_FAILED;
+                });
+        }
+    });
+
+    useAIButton.addEventListener('click', () => {
+        chrome.storage.local.get('isAIEnabled', (data) => {
+            const newState = !data.isAIEnabled;
+            chrome.storage.local.set({ isAIEnabled: newState }, () => {
+                updateAIButtonState(newState);
+            });
+        });
     });
     
     function flashElement(element) {
@@ -108,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (typeof data.duplicates === 'number') {
-                statusElem.textContent += ` | Дубликаты: ${data.duplicates}`;
+                statusElem.textContent += ` | ${data.duplicates}`;
             }
         });
     };
@@ -123,9 +179,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab) throw new Error('No active tab found');
 
-            chrome.runtime.sendMessage({
-                type: "initSelection", 
-                tabId: tab.id
+            chrome.storage.local.get('isAIEnabled', (data) => {
+                chrome.runtime.sendMessage({
+                    type: "initSelection", 
+                    tabId: tab.id,
+                    useAI: data.isAIEnabled
+                });
             });
         } catch (error) {
             console.error('Error initiating selection:', error);
@@ -167,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('No active tab found');
             }
             
-            statusElem.textContent = 'Проверка уникальности...';
+            statusElem.textContent = 'Поиск дублей...';
             chrome.tabs.sendMessage(tab.id, {
                 type: "checkXpathUniqueness",
                 xpath: xpathToCheck
@@ -213,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (typeof message.duplicates === 'number') {
-                statusElem.textContent += ` | Дубликаты: ${message.duplicates}`;
+                statusElem.textContent += ` | ${message.duplicates}`;
             }
         }
     });

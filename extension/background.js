@@ -1,4 +1,4 @@
-// background.js - Service Worker
+// background.js - Service Worker to handle AI API calls
 
 // Default settings - these will be overridden by user settings from storage
 let settings = {
@@ -44,6 +44,24 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 // Listen for messages from the content script or popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === "initSelection") {
+        if (request.tabId) {
+            chrome.tabs.sendMessage(request.tabId, { 
+                type: "activateSelection",
+                useAI: request.useAI
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.warn("XPath AI: Could not send activateSelection to content script.", chrome.runtime.lastError.message);
+                } else {
+                    console.log("XPath AI: activateSelection message sent to tab", request.tabId, "with useAI:", request.useAI);
+                }
+            });
+        } else {
+            console.error("XPath AI: initSelection request missing tabId.");
+        }
+        return true;
+    }
+
     if (request.action === "generateXPath") {
         console.log("XPath AI: Received generateXPath request", request.data);
         handleGenerateXPathRequest(request.data)
@@ -91,25 +109,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: true, data: settings });
         });
         return true; 
-    } else if (request.type === "initSelection") {
-        if (request.tabId) {
-            chrome.tabs.sendMessage(request.tabId, { type: "activateSelection" }, (response) => {
-                if (chrome.runtime.lastError) {
-                    console.warn("XPath AI: Could not send activateSelection to content script. It might not be injected or ready.", chrome.runtime.lastError.message);
-                } else {
-                    console.log("XPath AI: activateSelection message sent to tab", request.tabId);}
-            });
-        } else {
-            console.error("XPath AI: initSelection request missing tabId.");}
-        return true;
     }
 });
 
 async function getAIGeneratedXPath(dom, element, prompt_template_override) {
+    const prompt = generatePromptForAI(dom, element, prompt_template_override);
     if (!settings.apiServiceUrl || !settings.apiKey) {
         throw new Error("API Service URL or API Key is not configured. Please check the extension options.");
     }
-    const prompt = generatePromptForAI(dom, element, prompt_template_override);
     const aiResponseText = await callAIModelAPI(prompt);
     return parseAIResponse(aiResponseText, dom);
 }
@@ -136,18 +143,14 @@ async function handleGenerateXPathRequest(data) {
 }
 
 function generatePromptForAI(domString, elementData, promptTemplateOverride) {
+    
     let template = promptTemplateOverride || settings.defaultPromptTemplate;
-    
-    console.log("XPath AI: Cleaning DOM for prompt...");
-    const cleanedDom = cleanDOMForPrompt(domString);
-    const elementHtml = elementData.html || '';
-    
     let prompt = template
-        .replace("{element}", elementHtml)
-        .replace("{dom}", cleanedDom);
+        .replace("{element}", elementData.html)
+        .replace("{dom}", domString);
     
     if (prompt.length > settings.maxPromptLength) {
-        console.warn(`XPath AI: Prompt length ${prompt.length} exceeds MAX_PROMPT_LENGTH (${settings.maxPromptLength}). Truncating.`);
+        console.warn(`XPath AI: Prompt length ${prompt.length} exceeds MAX_PROMPT_LENGTH (${settings.maxPromptLength}). Truncating DOM.`);
         // prioritize truncating the DOM part
         const elementPlaceholder = "{element}";
         const domPlaceholder = "{dom}";
@@ -179,66 +182,6 @@ function generatePromptForAI(domString, elementData, promptTemplateOverride) {
     
     console.log("XPath AI: Generated prompt (first 500 chars):", prompt.substring(0,500));
     return prompt;
-}
-
-function cleanDOMForPrompt(domString) {
-    if (typeof domString !== 'string' || domString.trim() === '') {
-        return "";
-    }
-    console.time("XPath AI: DOM Cleaning");
-    try {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(domString, "text/html");
-
-        const tagsToRemove = ['script', 'style', 'noscript', 'meta', 'link', 'svg', 'iframe', 'embed', 'object', 'canvas', 'audio', 'video'];
-        tagsToRemove.forEach(tagName => {
-            Array.from(doc.getElementsByTagName(tagName)).forEach(el => el.remove());
-        });
-
-        const commentIterator = doc.createNodeIterator(doc.documentElement, NodeFilter.SHOW_COMMENT);
-        let currentNode;
-        while (currentNode = commentIterator.nextNode()) {
-            currentNode.remove();
-        }
-        
-        // Remove all attributes except a few common/useful ones to reduce size and noise
-        // This is aggressive and might remove necessary attributes for context.
-        // Consider making this configurable or less aggressive.
-        // For now, let's keep more attributes.
-        /*
-        doc.querySelectorAll('*').forEach(el => {
-            const allowedAttrs = ['id', 'class', 'name', 'href', 'src', 'alt', 'title', 'role', 'type', 'value', 'placeholder', 'aria-label', 'aria-labelledby', 'aria-describedby', 'data-testid'];
-            Array.from(el.attributes).forEach(attr => {
-                if (!allowedAttrs.includes(attr.name.toLowerCase()) && !attr.name.startsWith('data-')) {
-                    el.removeAttribute(attr.name);
-                }
-            });
-        });
-        */
-
-        let cleanedHtml = doc.body ? doc.body.innerHTML : doc.documentElement.innerHTML;
-        cleanedHtml = cleanedHtml.replace(/\s+/g, ' ').trim(); // Compact whitespace
-        
-        console.debug(`XPath AI: DOM cleaned. Original size: ${domString.length}, Cleaned size: ${cleanedHtml.length}`);
-        console.timeEnd("XPath AI: DOM Cleaning");
-        return cleanedHtml;
-
-    } catch (e) {
-        console.error("XPath AI: DOMParser cleaning failed, using basic regex cleaning:", e);
-        // Basic regex cleaning as a fallback (less effective)
-        let cleaned = domString
-            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
-            .replace(/<!--[\s\S]*?-->/g, "")
-            .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, "")
-            .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, "") // Remove SVG tags
-            .replace(/<meta\b[^>]*>/gi, "")    // Remove meta tags
-            .replace(/<link\b[^>]*>/gi, "");   // Remove link tags
-        
-        cleaned = cleaned.replace(/\s+/g, ' ').trim();
-        console.timeEnd("XPath AI: DOM Cleaning");
-        return cleaned;
-    }
 }
 
 async function callAIModelAPI(prompt) {
