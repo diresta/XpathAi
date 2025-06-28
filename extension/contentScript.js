@@ -35,7 +35,7 @@ function init() {
     setupHighlightStyles();
 
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        switch(message.type) 
+        switch(message.action) 
         {
             case "activateSelection":
                 useAIForNextGeneration = message.useAI;

@@ -44,10 +44,10 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 
 // Listen for messages from the content script or popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === "initSelection") {
+    if (request.action === "initSelection") {
         if (request.tabId) {
             chrome.tabs.sendMessage(request.tabId, { 
-                type: "activateSelection",
+                action: "activateSelection",
                 useAI: request.useAI
             }, (response) => {
                 if (chrome.runtime.lastError) {
