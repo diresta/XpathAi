@@ -15,23 +15,39 @@
         <button id="openSettings">⚙️</button>
     </div>
     <div class="container">
-        <div class="xpath-section">
-            <div class="xpath-header">
-                <span>XPath</span>
-            </div>
-            <input type="text" id="primaryXpathOutput" readonly class="xpath-field" placeholder="XPath появится здесь">
-            <div class="xpath-header alternative-header">
-                <span>alt. XPath</span>
-            </div>
-            <input type="text" id="alternativeXpathOutput" readonly class="xpath-field">
+        <div class="tabs-nav">
+            <button class="tab-button active" data-tab="main">Поиск</button>
+            <button class="tab-button" data-tab="history">История</button>
         </div>
-        <div class="explanation-section" id="explanationSection">
-            <div class="explanation-header">
-                <span>Объяснение</span>
-                <button id="toggleExplanation">▼</button>
+        <div class="tab-content active" id="mainTab">
+            <div class="xpath-section">
+                <div class="xpath-header">
+                    <span>XPath</span>
+                </div>
+                <input type="text" id="primaryXpathOutput" readonly class="xpath-field" placeholder="XPath появится здесь">
+                <div class="xpath-header alternative-header">
+                    <span>alt. XPath</span>
+                </div>
+                <input type="text" id="alternativeXpathOutput" readonly class="xpath-field" placeholder="Альтернативный XPath">
             </div>
-            <div class="explanation-content" id="explanationContent"></div>
-        </div>        
+            <div class="explanation-section" id="explanationSection">
+                <div class="explanation-header">
+                    <span>Объяснение</span>
+                    <button id="toggleExplanation">▼</button>
+                </div>
+                <div class="explanation-content" id="explanationContent"></div>
+            </div>        
+
+        </div>
+        <div class="tab-content" id="historyTab">
+            <div class="history-controls">
+                <input type="text" id="historySearch" placeholder="Поиск по URL или XPath...">
+                <button id="clearHistory">🗑️</button>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="empty-history">История пуста</div>
+            </div>
+        </div>
         <button id="checkUniqueness">🦄 Поиск дублей</button>
         <div id="status">Статус: Не активно</div>
     </div>

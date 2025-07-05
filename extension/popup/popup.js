@@ -13,6 +13,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const alternativeHeader = document.querySelector('.alternative-header');
     const useAIButton = document.getElementById('useAI');
 
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    const historySearch = document.getElementById('historySearch');
+    const clearHistoryButton = document.getElementById('clearHistory');
+    const historyList = document.getElementById('historyList');
+
     const STATUS = {
         INACTIVE: 'Не активно',
         SELECTING: 'Выбор элемента...',
@@ -112,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.local.get([
             'status', 'response', 'xpath', 'error', 
             'duplicates', 'alternativeXpath', 'explanation'
-        ], (data) => {
+        ], async (data) => {
             if (chrome.runtime.lastError) {
                 setStatusWithLoader(STATUS.STORAGE_ERROR, false, 'status-error');
                 setElementState(primaryXpathOutput, '');
@@ -133,6 +140,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusClass = 'status-error';
             } else if (data.xpath) {
                 statusClass = 'status-success';
+                
+                // Save to history
+                if (data.xpath && !data.error && !data.xpath.startsWith('Ошибка:')) {
+                    try {
+                        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                        if (tab && tab.url) {
+                            await saveToHistory(data.xpath, tab.url);
+                        }
+                    } catch (error) {
+                        console.error('Error saving to history:', error);
+                    }
+                }
             }
             
             setStatusWithLoader(`Статус: ${currentStatus}`, showLoader, statusClass);
@@ -235,4 +254,153 @@ document.addEventListener('DOMContentLoaded', () => {
             setStatusWithLoader(`Error: ${error.message}`, false, 'status-error');
         }
     });
+
+    // Tab switching
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-tab');
+            
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            button.classList.add('active');
+            document.getElementById(targetTab + 'Tab').classList.add('active');
+            
+            if (targetTab === 'history') {
+                loadHistory();
+            }
+        });
+    });
+
+    async function loadHistory() {
+        try {
+            const data = await chrome.storage.local.get('xpathHistory');
+            const history = data.xpathHistory || [];
+            renderHistory(history);
+        } catch (error) {
+            console.error('Error loading history:', error);
+        }
+    }
+
+    function renderHistory(history) {
+        if (history.length === 0) {
+            historyList.innerHTML = '<div class="empty-history">История пуста</div>';
+            return;
+        }
+
+        const sortedHistory = history.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        historyList.innerHTML = sortedHistory.map(item => `
+            <div class="history-item" data-xpath="${escapeHtml(item.xpath)}">
+                <div class="history-item-header">
+                    <div class="history-item-url">${escapeHtml(truncateUrl(item.url))}</div>
+                    <div class="history-item-date">${formatDate(item.timestamp)}</div>
+                </div>
+                <div class="history-item-xpath">${escapeHtml(item.xpath)}</div>
+            </div>
+        `).join('');
+
+        document.querySelectorAll('.history-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const xpath = item.getAttribute('data-xpath');
+                copyToClipboard(xpath);
+                showNotification('XPath скопирован!');
+            });
+        });
+    }
+
+    function truncateUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            const domain = urlObj.hostname;
+            return domain.length > 30 ? domain.substring(0, 27) + '...' : domain;
+        } catch {
+            return url.length > 30 ? url.substring(0, 27) + '...' : url;
+        }
+    }
+
+    function formatDate(timestamp) {
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    async function copyToClipboard(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (error) {
+            console.error('Copy failed:', error);
+            return false;
+        }
+    }
+
+    function showNotification(message) {
+        const notification = document.createElement('div');
+        notification.className = 'copied-notification';
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 2000);
+    }
+
+    // History search functionality
+    historySearch.addEventListener('input', () => {
+        const query = historySearch.value.toLowerCase();
+        const items = document.querySelectorAll('.history-item');
+        
+        items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            item.style.display = text.includes(query) ? 'block' : 'none';
+        });
+    });
+
+    clearHistoryButton.addEventListener('click', async () => {
+        if (confirm('Очистить всю историю?')) {
+            try {
+                await chrome.storage.local.set({ xpathHistory: [] });
+                loadHistory();
+                showNotification('История очищена');
+            } catch (error) {
+                console.error('Error clearing history:', error);
+            }
+        }
+    });
+
+    async function saveToHistory(xpath, url) {
+        try {
+            const data = await chrome.storage.local.get('xpathHistory');
+            const history = data.xpathHistory || [];
+            
+            // Check if this xpath already exists
+            const exists = history.some(item => item.xpath === xpath && item.url === url);
+            if (exists) return;
+            
+            const newItem = {
+                id: Date.now(),
+                xpath: xpath,
+                url: url,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Add to beginning and limit to 50 items
+            history.unshift(newItem);
+            if (history.length > 50) {
+                history.splice(50);
+            }
+            
+            await chrome.storage.local.set({ xpathHistory: history });
+        } catch (error) {
+            console.error('Error saving to history:', error);
+        }
+    }
 });
