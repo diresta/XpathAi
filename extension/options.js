@@ -57,7 +57,8 @@ Ensure the output is a single, valid JSON object only.`
     Promise.all([
         loadTemplateFromFile('template1', 'prompt_template.txt'),
         loadTemplateFromFile('template2', 'prompt_template2.txt'),
-        loadTemplateFromFile('template3', 'prompt_template3.txt')
+        loadTemplateFromFile('template3', 'prompt_template3.txt'),
+        loadTemplateFromFile('custom', 'template.txt')
     ]).then(() => {
         loadSettings();
     });
