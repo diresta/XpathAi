@@ -21,11 +21,11 @@ html, body {
 
 body { 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  padding: 20px; 
+  padding: 15px; 
   background: linear-gradient(135deg, var(--background) 0%, #1e293b 100%);
   color: var(--text);
-  max-width: 1000px;
-  margin: 40px auto;
+  width: 1000px;
+  margin: 20px auto;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
   border-radius: 16px;
   min-height: 100vh;
@@ -36,7 +36,6 @@ body {
   gap: 10px;
   padding: 32px;
   font-family: sans-serif;
-  max-width: 1200px;
   margin: 0 auto;
   background: var(--surface);
   border-radius: 16px;
@@ -128,7 +127,7 @@ input[type="url"],
 input[type="password"],
 input[type="number"],
 textarea { 
-  width: calc(100% - 22px); 
+  width: calc(100% - 15px); 
   padding: 14px 16px; 
   border: 2px solid var(--border);
   border-radius: 8px;

@@ -64,6 +64,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.action === "generateXPath") {
         console.log("XPath AI: Received generateXPath request", request.data);
+        
+        const processingStatus = 'Обработка запроса...';
+        chrome.storage.local.set({
+            status: processingStatus,
+            error: null
+        });
+        
         handleGenerateXPathRequest(request.data)
             .then(responsePayload => {
                 console.log("XPath AI: Sending success response to original sender", responsePayload);

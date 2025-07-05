@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const STATUS = {
         INACTIVE: 'Не активно',
         SELECTING: 'Выбор элемента...',
+        PROCESSING: 'Обработка запроса...',
         COPIED: 'XPath скопирован в буфер обмена!',
         COPY_FAILED: 'Не удалось скопировать XPath.',
         STORAGE_ERROR: 'Ошибка при получении данных из хранилища.'
@@ -25,6 +26,15 @@ document.addEventListener('DOMContentLoaded', () => {
         element.value = value;
         element.classList.toggle('error', isError);
         element.classList.toggle('success', !isError && value);
+    };
+
+    const setStatusWithLoader = (message, showLoader = false, statusClass = '') => {
+        statusElem.className = statusClass;
+        if (showLoader) {
+            statusElem.innerHTML = `<span class="loader"></span>${message}`;
+        } else {
+            statusElem.textContent = message;
+        }
     };
 
     const updateAIButtonState = (isAIEnabled) => {
@@ -56,11 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (element.value) {
             navigator.clipboard.writeText(element.value)
                 .then(() => {
-                    statusElem.textContent = STATUS.COPIED;
+                    setStatusWithLoader(STATUS.COPIED, false, 'status-success');
                     flashElement(element);
                 })
                 .catch(() => {
-                    statusElem.textContent = STATUS.COPY_FAILED;
+                    setStatusWithLoader(STATUS.COPY_FAILED, false, 'status-error');
                 });
         }
     }
@@ -104,13 +114,28 @@ document.addEventListener('DOMContentLoaded', () => {
             'duplicates', 'alternativeXpath', 'explanation'
         ], (data) => {
             if (chrome.runtime.lastError) {
-                statusElem.textContent = STATUS.STORAGE_ERROR;
+                setStatusWithLoader(STATUS.STORAGE_ERROR, false, 'status-error');
                 setElementState(primaryXpathOutput, '');
                 setElementState(alternativeXpathOutput, '');
                 return;
             }
             
-            statusElem.textContent = `Статус: ${data.status || STATUS.INACTIVE}`;
+            const currentStatus = data.status || STATUS.INACTIVE;
+            
+            let showLoader = false;
+            let statusClass = '';
+            
+            if (currentStatus === STATUS.SELECTING || 
+                currentStatus === STATUS.PROCESSING) {
+                showLoader = true;
+                statusClass = 'status-loading';
+            } else if (data.error) {
+                statusClass = 'status-error';
+            } else if (data.xpath) {
+                statusClass = 'status-success';
+            }
+            
+            setStatusWithLoader(`Статус: ${currentStatus}`, showLoader, statusClass);
             
             console.log("UI Update with data:", data);
             
@@ -137,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (typeof data.duplicates === 'number') {
-                statusElem.textContent += ` | ${data.duplicates}`;
+                statusElem.innerHTML += ` | ${data.duplicates}`;
             }
         });
     };
@@ -151,6 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab) throw new Error('No active tab found');
+            setStatusWithLoader(`Статус: ${STATUS.SELECTING}`, true, 'status-loading');
 
             chrome.storage.local.get('isAIEnabled', (data) => {
                 chrome.runtime.sendMessage({
@@ -161,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (error) {
             console.error('Error initiating selection:', error);
-            statusElem.textContent = `Error: ${error.message}`;
+            setStatusWithLoader(`Error: ${error.message}`, false, 'status-error');
         }
     });
     
@@ -180,9 +206,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         statusElem.textContent = `Статус: ${STATUS.INACTIVE}`;
+        statusElem.className = '';
         alternativeHeader.style.display = 'none';
         alternativeXpathOutput.style.display = 'none';
-        explanationSection.style.display = 'none';
+        explanationSection.style.display = 'none';   
     });
 
     settingsButton.addEventListener('click', () => {
@@ -199,14 +226,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('No active tab found');
             }
             
-            statusElem.textContent = 'Поиск дублей...';
             chrome.tabs.sendMessage(tab.id, {
                 action: "checkXpathUniqueness",
                 xpath: xpathToCheck
             });
         } catch (error) {
             console.error('Error checking uniqueness:', error);
-            statusElem.textContent = `Error: ${error.message}`;
+            setStatusWithLoader(`Error: ${error.message}`, false, 'status-error');
         }
     });
 });
