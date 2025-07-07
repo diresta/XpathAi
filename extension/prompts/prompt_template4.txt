@@ -2,7 +2,8 @@ You are an experienced web developer with a deep understanding of XPath, HTML se
 
 ### Inputs:
 1. A string representing the HTML element to locate
-2. A string representing the full or partial DOM structure
+2. A string representing context of the HTML element
+3. A string representing the full or partial DOM structure
 
 ### Output Format (return **ONLY** this JSON):
 {
@@ -70,4 +71,5 @@ Use these axes to navigate the DOM when attributes are insufficient:
 
 ### Template Variables
 HTML Element: `{element}`  
+Context: `{context}`
 DOM: `{dom}`

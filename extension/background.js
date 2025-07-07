@@ -7,8 +7,11 @@ let settings = {
     modelName: 'gpt-3.5-turbo',
     maxPromptLength: 70000,
     requestTimeout: 60, // seconds
-    defaultPromptTemplate: `Generate an XPath that uniquely identifies this element:
+defaultPromptTemplate: `Generate an XPath that uniquely identifies this element:
 {element}
+
+Context:
+{context}
 
 Within this DOM:
 {dom}
@@ -119,8 +122,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-async function getAIGeneratedXPath(dom, element, prompt_template_override) {
-    const prompt = generatePromptForAI(dom, element, prompt_template_override);
+async function getAIGeneratedXPath(dom, context, element, prompt_template_override) {
+    const prompt = generatePromptForAI(dom, context, element, prompt_template_override);
     if (!settings.apiServiceUrl || !settings.apiKey) {
         throw new Error("API Service URL or API Key is not configured. Please check the extension options.");
     }
@@ -129,12 +132,12 @@ async function getAIGeneratedXPath(dom, element, prompt_template_override) {
 }
 
 async function handleGenerateXPathRequest(data) {
-    const { dom, element, use_ai, prompt_template_override } = data;
+    const { dom, context, element, use_ai, prompt_template_override } = data;
 
     let responsePayload = {};
 
     if (use_ai) {
-        responsePayload = await getAIGeneratedXPath(dom, element, prompt_template_override);
+        responsePayload = await getAIGeneratedXPath(dom, context, element, prompt_template_override);
         responsePayload.isAI = true; 
     } else {
         const simpleXPath = generateSimpleXPath(element);
@@ -149,11 +152,12 @@ async function handleGenerateXPathRequest(data) {
     return responsePayload;
 }
 
-function generatePromptForAI(domString, elementData, promptTemplateOverride) {
+function generatePromptForAI(domString, context, elementData, promptTemplateOverride) {
     
     let template = promptTemplateOverride || settings.defaultPromptTemplate;
     let prompt = template
         .replace("{element}", elementData.html)
+        .replace("{context}", context)
         .replace("{dom}", domString);
     
     if (prompt.length > settings.maxPromptLength) {
@@ -187,7 +191,7 @@ function generatePromptForAI(domString, elementData, promptTemplateOverride) {
         console.log(`XPath AI: Truncated prompt length: ${prompt.length}`);
     }
     
-    console.log("XPath AI: Generated prompt (first 500 chars): ", prompt.substring(0,500));
+    console.log("XPath AI: Generated prompt (first 500 chars): ", prompt);
     return prompt;
 }
 
@@ -201,17 +205,17 @@ async function callAIModelAPI(prompt) {
         model: settings.modelName,
         messages: [{ role: "user", content: prompt }],
         stream: false,
-        max_tokens: 1024,
-        stop: ["null"],
-        temperature: 0.0,
-        top_p: 1.0,
-        top_k: 0,
-        frequency_penalty: 0.5,
-        n: 1,
-        response_format: {"type": "text"}
+        //max_tokens: 512,
+        //stop: ["null"],
+        //temperature: 0.7,
+        //top_p: 0.7,
+        //top_k: 50,
+        //frequency_penalty: 0.5,
+        //n: 1,
+        //response_format: {"type": "text"}
     };
 
-    console.log("XPath AI: Sending request to AI API:", settings.apiServiceUrl, "Headers:", JSON.stringify(headers), "Payload (preview):", JSON.stringify(payload).substring(0, 1000));
+    console.log("XPath AI: Sending request to AI API:", settings.apiServiceUrl, "Headers:" ,JSON.stringify(headers), "Payload (f1000):", JSON.stringify(payload).substring(0, 1000));
     console.time("XPath AI: AI API Call");
 
     try {
