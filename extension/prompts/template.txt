@@ -4,15 +4,27 @@ You are an experienced web developer with a deep understanding of XPath, HTML se
 1. A string representing the HTML element to locate
 2. A string representing the full or partial DOM structure
 
----
-
 ### Output Format (return **ONLY** this JSON):
 {
   "primary_xpath": "<string>",
   "alternative_xpath": "<string or empty>",
   "explanation": "<brief reasoning or empty>"
 }
+
 ⚠️ Do **not** include any markdown (```), extra commentary, or repeat the inputs. Output must be valid, directly parseable JSON.
+
+### XPath Axes Reference (for advanced structure-based matching):
+Use these axes to navigate the DOM when attributes are insufficient:
+- `ancestor::` — selects any parent or grandparent
+- `parent::` — selects immediate parent
+- `child::` — selects direct children
+- `descendant::` — selects all nested elements
+- `following-sibling::` — selects next sibling elements
+- `preceding-sibling::` — selects previous sibling elements
+- `following::` — selects all nodes after current one in the DOM
+- `preceding::` — selects all nodes before the current one
+
+- Use them to relate the element to stable neighbors when direct matching is fragile.
 
 ---
 
@@ -28,7 +40,7 @@ You are an experienced web developer with a deep understanding of XPath, HTML se
 ---
 
 ### XPath Best Practices:
-- Avoid fragile or dynamic values like hashes, randomized classnames (`'sPX6v'`, `a3ba1d5...`)
+- Avoid fragile or dynamic values like hashes, randomized class names (`'sPX6v'`, `a3ba1d5...`)
 - Prefer: `//button[@data-testid='submit']`
 - Avoid: `//div[3]/button` or `//span[text()='Login']`
 - Use `normalize-space()` for trimmed text matching
@@ -47,6 +59,7 @@ You are an experienced web developer with a deep understanding of XPath, HTML se
 
 ### Example:
 **Element:** `<button data-testid="save-btn">Save</button>`  
+**Context:** "Primary save action in the form footer"  
 **DOM:** `<div><form><button data-testid="save-btn">Save</button></form></div>`  
 **Output:**
 {
@@ -55,5 +68,6 @@ You are an experienced web developer with a deep understanding of XPath, HTML se
   "explanation": "Used stable test attribute first, with text fallback for redundancy."
 }
 
+### Template Variables
 HTML Element: `{element}`  
 DOM: `{dom}`
