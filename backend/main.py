@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 # Suppress DEBUG messages from HTTP libraries
 logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("httpx").setLevel(logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # Keep app logs at DEBUG level
@@ -38,8 +38,10 @@ class LlamaCppServer:
         
     async def start_server(self, model_name: str, extra_args: Optional[List[str]] = None):
         """Start llama.cpp server with specified model."""
+        logging.debug(f"start_server called with model: {model_name}")
         async with self.lock:
             if self.process and self.current_model == model_name:
+                logging.debug(f"Server already running with {model_name}, skipping")
                 return  # Already running with this model
                 
             await self._stop_server_internal()
@@ -95,7 +97,11 @@ class LlamaCppServer:
                     break
                 error_msg = line.decode().strip()
                 if error_msg:
-                    logging.error(f"llama-server stderr: {error_msg}")
+                    import re
+                    # Regex pattern to match health check log messages
+                    health_check_pattern = re.compile(r"request:\s*GET\s*/health", re.IGNORECASE)
+                    if not health_check_pattern.search(error_msg):
+                        logging.error(f"llama-server: {error_msg}")
         except Exception as e:
             logging.debug(f"Error reading stderr: {e}")
         
@@ -172,8 +178,8 @@ class LlamaCppServer:
         except (httpx.RequestError, asyncio.TimeoutError) as e:
             logging.debug(f"Ready check failed: {e}")
             return False
-        
-    async def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+
+    async def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.3, timeout: float = 60.0) -> str:
         """Generate text using llama.cpp server."""
         if not await self.is_ready():
             raise RuntimeError("Server not ready - model may still be loading")
@@ -182,11 +188,29 @@ class LlamaCppServer:
             "prompt": prompt,
             "n_predict": max_tokens,
             "temperature": temperature,
-            "stop": ["</s>", "\n\n"],
+            "top_p": 0.8,
+            "top_k": 30,
+            "repeat_penalty": 1.3,
+            "repeat_last_n": 128,
+            "frequency_penalty": 0.5,
+            "presence_penalty": 0.3,
+            "stop": [
+                "</s>", 
+                "<|end|>", 
+                "<|im_end|>",
+                "\n\n\n",
+                "\n---",
+                "Example:",
+                "Note:",
+                "Explanation:",
+                "Alternative:",
+            ],
             "stream": False
         }
-        
-        async with httpx.AsyncClient(timeout=60.0) as client:
+
+        logging.debug(f"Sending request to llama.cpp server: {payload}")
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(f"{self.base_url}/completion", json=payload)
             response.raise_for_status()
             result = response.json()
@@ -218,8 +242,8 @@ class Settings(BaseSettings):
     llamacpp_binary: str = "/app/llm/llama-server"
     llamacpp_port: int = 8080
     default_model: str = "model.gguf"
-    max_tokens: int = 512
-    temperature: float = 0.7
+    max_tokens: int = 256
+    temperature: float = 0.3
     request_timeout: int = 300
     
     class Config:
@@ -294,13 +318,15 @@ async def call_llama(prompt: str, model: Optional[str] = None) -> str:
     try:
         # Switch model if requested
         if model and model != llama_server.current_model:
+            logging.debug(f"Model switch requested: {llama_server.current_model} -> {model}")
             await llama_server.start_server(model)
             model_manager.set_current_model(model)
             
         response = await llama_server.generate(
             prompt=prompt,
             max_tokens=settings.max_tokens,
-            temperature=settings.temperature
+            temperature=settings.temperature,
+            timeout=settings.request_timeout
         )
         return response
     except Exception as e:
