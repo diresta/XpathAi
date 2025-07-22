@@ -15,11 +15,18 @@ services:
     build:
       context: ./
     container_name: backend
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
+      - "8080:8080"
+    volumes:
+      - ./llm/models:/app/llm/models
     restart: always
     networks:
       - app_network
+    environment:
+      - models_dir=/app/llm/models
+      - llamacpp_binary=/app/llm/bin/llama-server
+      - llamacpp_port=8080
 
 networks:
   app_network:
