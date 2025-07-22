@@ -24,3 +24,6 @@ Thumbs.db
 
 # LLM binaries
 backend/llm
+
+# Testing artifacts
+backend/test
