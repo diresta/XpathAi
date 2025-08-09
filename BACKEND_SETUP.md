@@ -5,13 +5,18 @@
 ## Структура backend
 
 - **backend/**
-  - `main.py` – FastAPI сервер для генерации XPath
+  - `main.py` – FastAPI сервер для работы с llama.cpp
+  - `main_ollama.py` – FastAPI сервер для работы с локальной Ollama
   - `requirements.txt` – зависимости Python
   - `default_template.txt` – базовый промпт для генерации ответа
-  - `docker-compose.yml` – конфигурация Docker Compose
-  - `Dockerfile` – образ Docker
+  - **Docker конфигурации:**
+    - `docker-compose.yml` – основной backend с llama.cpp 
+    - `docker-compose.ollama.yml` – backend для локальной Ollama
+    - `docker-compose.gpu.yml` – дополнительный GPU backend
+    - `Dockerfile` – llama.cpp + cuda
+    - `Dockerfile.ollama` – легкий образ для Ollama
   - `nginx.conf` – конфигурация Nginx
-  - Скрипты запуска:
+  - **Скрипты запуска:**
     - `start_backend_docker.cmd` / `start_backend_docker.sh`
     - `start_backend_venv.cmd` / `start_backend_venv.sh`
 
@@ -41,6 +46,37 @@ MODEL_NAME=deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
 - Qwen/Qwen2.5-Coder-7B-Instruct
 
 ## Запуск backend в Docker
+
+### Выбор типа backend
+
+В проекте доступно несколько вариантов backend:
+
+1. **docker-compose.yml** - Основной backend с llama.cpp и GPU поддержкой
+2. **docker-compose.ollama.yml** - Backend для работы с локальной Ollama
+3. **docker-compose.gpu.yml** - Оптимизированный GPU backend
+
+### Backend с локальной Ollama (рекомендуется для Windows)
+
+**Установка Ollama:**
+1. Скачайте с https://ollama.ai/
+2. Установите модель: `ollama pull qwen2.5:3b`
+
+**Запуск с Docker:**
+```cmd
+cd backend
+docker-compose -f docker-compose.ollama.yml up -d --build
+```
+
+**Проверка работы:**
+```cmd
+# Проверить доступность Ollama
+curl http://localhost:11434/api/tags
+
+# Проверить backend
+curl http://localhost:8000/health
+```
+
+### Запуск с llama.cpp (GPU сборка)
 
 ### Использование готовых скриптов
 
