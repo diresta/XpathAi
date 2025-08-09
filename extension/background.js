@@ -201,17 +201,17 @@ async function callAIModelAPI(prompt) {
         model: settings.modelName,
         messages: [{ role: "user", content: prompt }],
         stream: false,
-        max_tokens: 512,
+        max_tokens: 1024,
         stop: ["null"],
-        temperature: 0.7,
-        top_p: 0.7,
-        top_k: 50,
+        temperature: 0.0,
+        top_p: 1.0,
+        top_k: 0,
         frequency_penalty: 0.5,
         n: 1,
         response_format: {"type": "text"}
     };
 
-    console.log("XPath AI: Sending request to AI API:", settings.apiServiceUrl, "Headers:" ,JSON.stringify(headers), "Payload (preview):", JSON.stringify(payload).substring(0, 200));
+    console.log("XPath AI: Sending request to AI API:", settings.apiServiceUrl, "Headers:", JSON.stringify(headers), "Payload (preview):", JSON.stringify(payload).substring(0, 1000));
     console.time("XPath AI: AI API Call");
 
     try {
