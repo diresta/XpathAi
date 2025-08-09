@@ -381,7 +381,7 @@ class AIMessage(BaseModel):
 
 class AIRequest(BaseModel):
     model: str = "default"
-    messages: list[AIMessage]
+    messages: List[AIMessage]
     stream: bool = False
     max_tokens: int = 512
     temperature: float = 0.7
@@ -390,7 +390,7 @@ class AIRequest(BaseModel):
     frequency_penalty: float = 0.5
     n: int = 1
     response_format: dict = {"type": "text"}
-    stop: list = ["null"]
+    stop: List[str] = ["null"]
 
     @model_validator(mode="after") 
     def validate_fields(self):
