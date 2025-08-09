@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             apiServiceUrlInput.value = settings.apiServiceUrl || '';
             apiKeyInput.value = settings.apiKey || '';
-            modelNameInput.value = settings.modelName || '';
+            modelNameInput.value = settings.modelName || 'gpt-4';
             maxPromptLengthInput.value = settings.maxPromptLength || 10000;
             requestTimeoutInput.value = settings.requestTimeout || 60;
             const savedTemplate = settings.selectedTemplate || 'custom';
