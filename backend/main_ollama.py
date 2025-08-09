@@ -8,6 +8,8 @@ from time import time
 
 logging.basicConfig(level=logging.INFO)
 
+from typing import Optional, List
+
 app = FastAPI(title="XPathAI Backend - Ollama", description="AI-powered XPath generation with Ollama")
 
 app.add_middleware(
@@ -24,16 +26,16 @@ class AIMessage(BaseModel):
 
 class AIRequest(BaseModel):
     model: str = "qwen2.5:3b"
-    messages: list[AIMessage]
+    messages: List[AIMessage]
     stream: bool = False
     max_tokens: int = 512
-    temperature: float = 0.7
-    top_p: float = 0.7
-    top_k: int = 50
+    temperature: float = 0.0
+    top_p: float = 1.0
+    top_k: int = 0
     frequency_penalty: float = 0.5
     n: int = 1
     response_format: dict = {"type": "text"}
-    stop: list = ["</s>", "<|end|>", "\n\n"]
+    stop: List[str] = ["</s>", "<|end|>", "\n\n"]
 
     @model_validator(mode="after") 
     def validate_fields(self):
@@ -41,26 +43,37 @@ class AIRequest(BaseModel):
             raise ValueError('Field "messages" must contain at least one message')
         return self
 
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+class ModelRequest(BaseModel):
+    model: str
 
+class ModelResponse(BaseModel):
+    current_model: Optional[str]
+    available_models: List[str]
+    backend: str = "ollama"
+    error: Optional[str] = None
+
+
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 logging.info(f"Ollama URL: {OLLAMA_BASE_URL}")
 
-async def call_ollama(prompt: str, model: str = "qwen2.5:3b", *, max_tokens: int = 512, temperature: float = 0.3) -> str:
+CURRENT_MODEL = None
+
+async def call_ollama(data: AIRequest) -> str:
     async with httpx.AsyncClient(timeout=120.0) as client:
         payload = {
-            "model": model,
-            "prompt": prompt,
+            "model": data.model,
+            "prompt": data.messages[0].content,
             "stream": False,
             "options": {
-                "temperature": float(temperature),
-                "top_p": 0.8,
-                "top_k": 30,
-                "repeat_penalty": 1.3,
-                "num_predict": int(max_tokens),
+                "temperature": float(data.temperature),
+                "top_p": float(data.top_p),
+                "top_k": int(data.top_k),
+                "repeat_penalty": float(data.frequency_penalty),
+                "num_predict": int(data.max_tokens),
                 "stop": ["</s>", "<|end|>", "\n\n\n"]
             }
         }
-        
+        logging.info(f"call_ollama: model={data.model}, max_tokens={data.max_tokens}, temperature={data.temperature}, prompt_len={len(data.messages[0].content)}, prompt_preview={data.messages[0].content[:1000].replace('\n',' ')}")
         try:
             response = await client.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload)
             response.raise_for_status()
@@ -79,12 +92,14 @@ async def generate_xpath(data: AIRequest):
             if msg.role == "user" and msg.content:
                 prompt_text = msg.content
                 break
-        
         if not prompt_text:
             raise HTTPException(status_code=400, detail="No user message found in request")
-        
-        response = await call_ollama(prompt_text, data.model, max_tokens=data.max_tokens, temperature=data.temperature)
+
+        response = await call_ollama(data)
+
         execution_time = time() - start
+        logging.info(f"/generate-xpath response time: {execution_time:.3f}s")
+        logging.info(f"/generate-xpath response: {response}")
         return {
             "choices": [
                 {
@@ -105,14 +120,13 @@ async def generate_xpath(data: AIRequest):
             "execution_time": execution_time,
             "backend": "ollama"
         }
-        
     except HTTPException:
         raise
     except Exception as e:
         logging.error(f"Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/models")
+@app.get("/models", response_model=ModelResponse)
 async def get_models():
     try:
         async with httpx.AsyncClient() as client:
@@ -120,11 +134,44 @@ async def get_models():
             if response.status_code == 200:
                 models_data = response.json()
                 models = [model["name"] for model in models_data.get("models", [])]
-                return {"available_models": models, "backend": "ollama"}
+                return ModelResponse(current_model=CURRENT_MODEL, available_models=models, backend="ollama")
             else:
-                return {"available_models": [], "error": "Ollama not available"}
+                return ModelResponse(current_model=CURRENT_MODEL, available_models=[], backend="ollama", error="Ollama not available")
     except Exception as e:
-        return {"available_models": [], "error": str(e)}
+        return ModelResponse(current_model=CURRENT_MODEL, available_models=[], backend="ollama", error=str(e))
+
+@app.put("/models")
+async def set_model(request: ModelRequest):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+            if response.status_code == 200:
+                models_data = response.json()
+                models = [model["name"] for model in models_data.get("models", [])]
+                if request.model not in models:
+                    raise HTTPException(status_code=400, detail=f"Model {request.model} not found. Available: {models}")
+                global CURRENT_MODEL
+                CURRENT_MODEL = request.model
+                return {"message": f"Switched to model: {request.model}", "current_model": CURRENT_MODEL}
+            else:
+                raise HTTPException(status_code=500, detail="Ollama not available")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Model switch error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to switch model")
+
+@app.get("/endpoint-health")
+async def endpoint_health():
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+            if response.status_code == 200:
+                return {"status": "ok", "ollama_status": "ready", "backend": "ollama", "url": OLLAMA_BASE_URL}
+            else:
+                return {"status": "error", "ollama_status": "error", "backend": "ollama", "url": OLLAMA_BASE_URL}
+    except Exception:
+        return {"status": "offline", "ollama_status": "offline", "backend": "ollama", "url": OLLAMA_BASE_URL}
 
 @app.get("/health")
 async def health_check():
@@ -141,54 +188,6 @@ async def health_check():
         "backend": "ollama",
         "url": OLLAMA_BASE_URL
     }
-
-@app.post("/v1/chat/completions")
-async def chat_completions(data: AIRequest):
-    """OpenAI-compatible Chat API endpoint."""
-    start = time()
-    try:
-        prompt = ""
-        model = data.model
-        
-        for msg in reversed(data.messages):
-            if msg.role == "user" and msg.content:
-                prompt = msg.content
-                break
-        
-        if not prompt:
-            raise HTTPException(status_code=400, detail="No user message found in request")
-        
-        logging.info(f"Chat API request for model: {model}")
-        
-        response_text = await call_ollama(prompt, model, max_tokens=data.max_tokens, temperature=data.temperature)
-        execution_time = time() - start
-        
-        return {
-            "choices": [
-                {
-                    "message": {
-                        "role": "assistant", 
-                        "content": response_text
-                    },
-                    "finish_reason": "stop",
-                    "index": 0
-                }
-            ],
-            "model": model,
-            "usage": {
-                "completion_tokens": len(response_text.split()),
-                "prompt_tokens": len(prompt.split()),
-                "total_tokens": len(response_text.split()) + len(prompt.split())
-            },
-            "execution_time": execution_time,
-            "backend": "ollama"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"Chat API error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Chat API error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

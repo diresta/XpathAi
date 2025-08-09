@@ -2,6 +2,8 @@ import asyncio
 import json
 import os
 from pathlib import Path
+import re
+import subprocess
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -72,12 +74,8 @@ class LlamaCppServer:
                 cmd.append("--mlock")
             # Try to add GPU support if available
             try:
-                import subprocess
-                
-                # Simple GPU detection
                 gpu_available = False
                 gpu_layers = "0"  # Default CPU
-                
                 # Check if NVIDIA GPU is available
                 try:
                     result = subprocess.run(["nvidia-smi"], capture_output=True, timeout=3, text=True)
@@ -85,7 +83,6 @@ class LlamaCppServer:
                         gpu_available = True
                         # Try to determine GPU layers dynamically based on GPU memory
                         try:
-                            import re
                             mem_match = re.search(r"(\d+)\s*MiB", result.stdout)
                             if mem_match:
                                 gpu_mem = int(mem_match.group(1))
@@ -164,8 +161,6 @@ class LlamaCppServer:
                     break
                 error_msg = line.decode().strip()
                 if error_msg:
-                    import re
-                    # Regex pattern to match health check log messages
                     health_check_pattern = re.compile(r"request:\s*GET\s*/health", re.IGNORECASE)
                     if not health_check_pattern.search(error_msg):
                         logging.error(f"llama-server: {error_msg}")
@@ -588,8 +583,6 @@ async def health_check():
     gpu_available = False
     gpu_info = "Not detected"
     try:
-        import os
-        import subprocess
         if os.path.exists("/usr/local/cuda") or os.environ.get("CUDA_VISIBLE_DEVICES"):
             result = subprocess.run(
                 ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
