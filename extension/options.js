@@ -14,34 +14,17 @@ document.addEventListener('DOMContentLoaded', () => {
         custom: {
             name: "Пользовательский шаблон",
             description: "Используйте свой собственный шаблон промпта",
-            content: `Generate an XPath that uniquely identifies this element:
-{element}
-
-Within this DOM:
-{dom}
-
-Please provide your response as a JSON object with the following keys:
-- "primary_xpath": (string) The most reliable XPath.
-- "alternative_xpath": (string | null) A backup XPath, or null if not applicable.
-- "explanation": (string) A brief explanation of why this approach was chosen.
-Ensure the output is a single, valid JSON object only.`
-        },
-        template1: {
-            name: "Базовый XPath шаблон",
-            description: "C правилами и практическими примерами",
-            content: null
-        },
-        template2: {
-            name: "Продвинутый XPath шаблон", 
-            description: "C системой приоритетов и всесторонними рекомендациями",
-            content: null
-        },
-        template3: {
-            name: "Компактный XPath шаблон",
-            description: "Краткая версия, сфокусированная на лучших практиках и производительности",
-            content: null
+            content: ""
         }
     };
+
+    const templateFiles = [
+        { key: 'template1', filename: 'prompt_template.txt', name: '1 Базовый XPath шаблон', description: 'C правилами и практическими примерами' },
+        { key: 'template2', filename: 'prompt_template2.txt', name: '2 Продвинутый XPath шаблон', description: 'C системой приоритетов и всесторонними рекомендациями' },
+        { key: 'template3', filename: 'prompt_template3.txt', name: '3 Компактный XPath шаблон', description: 'Краткая версия, сфокусированная на лучших практиках и производительности' },
+        { key: 'template4', filename: 'prompt_template4.txt', name: '4 Минималистичный XPath шаблон', description: 'Упрощенная версия с акцентом на краткость и ясность' },
+        { key: 'template5', filename: 'prompt_template5.txt', name: '5 Экспертный XPath шаблон', description: 'Подробное руководство с примерами и объяснениями' }
+    ];
 
     async function loadTemplateFromFile(templateKey, filename) {
         try {
@@ -49,17 +32,20 @@ Ensure the output is a single, valid JSON object only.`
             const content = await response.text();
             templates[templateKey].content = content;
         } catch (error) {
-            console.error(`Failed to load template ${filename}:`, error);
+            console.error(`Не удалось загрузить шаблон ${filename}:`, error);
             templates[templateKey].content = templates.custom.content;
         }
     }
 
-    Promise.all([
-        loadTemplateFromFile('template1', 'prompt_template.txt'),
-        loadTemplateFromFile('template2', 'prompt_template2.txt'),
-        loadTemplateFromFile('template3', 'prompt_template3.txt'),
-        loadTemplateFromFile('custom', 'template.txt')
-    ]).then(() => {
+    async function loadTemplates() {
+        const loadPromises = templateFiles.map(async ({ key, filename, name, description }) => {
+            templates[key] = { name, description, content: null };
+            await loadTemplateFromFile(key, filename);
+        });
+        await Promise.all(loadPromises);
+    }
+
+    loadTemplates().then(() => {
         loadSettings();
     });
 
@@ -102,7 +88,7 @@ Ensure the output is a single, valid JSON object only.`
             'selectedTemplate'
         ], (settings) => {
             if (chrome.runtime.lastError) {
-                console.error("Error loading settings:", chrome.runtime.lastError);
+                console.error("Ошибка загрузки настроек:", chrome.runtime.lastError);
                 statusDiv.textContent = 'Ошибка загрузки настроек.';
                 statusDiv.style.color = 'red';
                 return;
@@ -164,7 +150,7 @@ Ensure the output is a single, valid JSON object only.`
 
         chrome.storage.local.set(settingsToSave, () => {
             if (chrome.runtime.lastError) {
-                console.error("Error saving settings:", chrome.runtime.lastError);
+                console.error("Ошибка сохранения настроек:", chrome.runtime.lastError);
                 statusDiv.textContent = 'Ошибка сохранения настроек.';
                 statusDiv.classList.remove('success');
                 statusDiv.classList.add('error');
