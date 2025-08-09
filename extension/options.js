@@ -2,6 +2,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiServiceUrlInput = document.getElementById('apiServiceUrl');
     const apiKeyInput = document.getElementById('apiKey');
     const modelNameInput = document.getElementById('modelName');
+    const modelSelector = document.getElementById('modelSelector');
+    const modelStatus = document.getElementById('modelStatus');
+    const endpointStatus = document.getElementById('endpointStatus');
+    const checkEndpointButton = document.getElementById('checkEndpoint');
     const maxPromptLengthInput = document.getElementById('maxPromptLength');
     const requestTimeoutInput = document.getElementById('requestTimeout');
     const defaultPromptTemplateTextarea = document.getElementById('defaultPromptTemplate');
@@ -45,6 +49,108 @@ document.addEventListener('DOMContentLoaded', () => {
         await Promise.all(loadPromises);
     }
 
+    async function checkEndpoint(url) {
+        endpointStatus.textContent = 'Проверка...';
+        endpointStatus.className = '';
+        try {
+            const resp = await fetch(url.replace(/\/$/, '') + '/endpoint-health');
+            if (!resp.ok) throw new Error('Ошибка подключения');
+            const data = await resp.json();
+            if (data.status === 'ok' || data.status === 'ready' || data.server_ready) {
+                endpointStatus.textContent = '✅ Подключение успешно';
+                endpointStatus.className = 'success';
+            } else {
+                endpointStatus.textContent = '⚠️ Эндпоинт не готов: ' + (data.status || 'unknown');
+                endpointStatus.className = 'error';
+            }
+        } catch (e) {
+            endpointStatus.textContent = '❌ Нет подключения: ' + e.message;
+            endpointStatus.className = 'error';
+        }
+    }
+
+    async function fetchModels(url, selectedModel) {
+        modelSelector.innerHTML = '<option value="">Загрузка...</option>';
+        modelStatus.textContent = '';
+        try {
+            const resp = await fetch(url.replace(/\/$/, '') + '/models');
+            if (!resp.ok) throw new Error('Ошибка получения моделей');
+            const data = await resp.json();
+            if (Array.isArray(data.available_models)) {
+                modelSelector.innerHTML = '';
+                data.available_models.forEach(model => {
+                    const opt = document.createElement('option');
+                    opt.value = model;
+                    opt.textContent = model;
+                    modelSelector.appendChild(opt);
+                });
+                if (selectedModel && data.available_models.includes(selectedModel)) {
+                    modelSelector.value = selectedModel;
+                } else if (data.current_model) {
+                    modelSelector.value = data.current_model;
+                }
+                modelStatus.textContent = 'Доступно моделей: ' + data.available_models.length;
+                modelStatus.className = 'success';
+            } else {
+                modelSelector.innerHTML = '<option value="">Нет моделей</option>';
+                modelStatus.textContent = 'Нет доступных моделей';
+                modelStatus.className = 'error';
+            }
+        } catch (e) {
+            modelSelector.innerHTML = '<option value="">Ошибка</option>';
+            modelStatus.textContent = 'Ошибка загрузки моделей: ' + e.message;
+            modelStatus.className = 'error';
+        }
+    }
+
+    async function setModel(url, model) {
+        modelStatus.textContent = 'Смена модели...';
+        modelStatus.className = '';
+        try {
+            const resp = await fetch(url.replace(/\/$/, '') + '/models', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model })
+            });
+            if (!resp.ok) throw new Error('Ошибка смены модели');
+            const data = await resp.json();
+            modelStatus.textContent = 'Текущая модель: ' + (data.current_model || model);
+            modelStatus.className = 'success';
+        } catch (e) {
+            modelStatus.textContent = 'Ошибка смены модели: ' + e.message;
+            modelStatus.className = 'error';
+        }
+    }
+
+    // --- UI EVENTS ---
+    checkEndpointButton.addEventListener('click', () => {
+        const url = apiServiceUrlInput.value.trim();
+        if (!url) {
+            endpointStatus.textContent = 'Введите URL сервиса.';
+            endpointStatus.className = 'error';
+            return;
+        }
+        checkEndpoint(url);
+        fetchModels(url, modelSelector.value);
+    });
+
+    apiServiceUrlInput.addEventListener('change', () => {
+        const url = apiServiceUrlInput.value.trim();
+        if (url) {
+            fetchModels(url, modelSelector.value);
+        }
+    });
+
+    modelSelector.addEventListener('change', () => {
+        const url = apiServiceUrlInput.value.trim();
+        const model = modelSelector.value;
+        if (url && model) {
+            setModel(url, model);
+            modelNameInput.value = model;
+        }
+    });
+
+    // --- ШАБЛОНЫ ---
     loadTemplates().then(() => {
         loadSettings();
     });
@@ -71,7 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
     templateSelector.addEventListener('change', (e) => {
         const selectedTemplate = e.target.value;
         updateTemplateDescription(selectedTemplate);
-        
         if (selectedTemplate !== 'custom') {
             updateTemplateContent(selectedTemplate);
         }
@@ -93,23 +198,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusDiv.style.color = 'red';
                 return;
             }
-            
             apiServiceUrlInput.value = settings.apiServiceUrl || '';
             apiKeyInput.value = settings.apiKey || '';
-            modelNameInput.value = settings.modelName || 'gpt-4';
+            modelNameInput.value = settings.modelName || '';
             maxPromptLengthInput.value = settings.maxPromptLength || 10000;
             requestTimeoutInput.value = settings.requestTimeout || 60;
-            
             const savedTemplate = settings.selectedTemplate || 'custom';
             templateSelector.value = savedTemplate;
             updateTemplateDescription(savedTemplate);
-            
             if (settings.defaultPromptTemplate) {
                 defaultPromptTemplateTextarea.value = settings.defaultPromptTemplate;
             } else if (savedTemplate !== 'custom' && templates[savedTemplate] && templates[savedTemplate].content) {
                 defaultPromptTemplateTextarea.value = templates[savedTemplate].content;
             } else {
                 defaultPromptTemplateTextarea.value = defaultTemplateValue;
+            }
+            if (settings.apiServiceUrl) {
+                fetchModels(settings.apiServiceUrl, settings.modelName);
             }
         });
     }

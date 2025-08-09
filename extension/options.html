@@ -10,6 +10,8 @@
     <div class="field-group">
         <label for="apiServiceUrl">API URL сервиса ИИ:</label>
         <input type="url" id="apiServiceUrl" placeholder="напр, https://api.openai.com/v1/chat/completions">
+        <button id="checkEndpoint" type="button" style="margin-top:12px;">Проверить подключение</button>
+        <div id="endpointStatus" style="margin-top:8px;"></div>
     </div>
     
     <div class="field-group">
@@ -20,7 +22,9 @@
     
     <div class="field-group">
         <label for="modelName">Модель:</label>
+        <select id="modelSelector" style="margin-bottom:8px;"></select>
         <input type="text" id="modelName" placeholder="напр, gpt-4 или THUDM/glm-4-9b-chat">
+        <div id="modelStatus" style="margin-top:8px;"></div>
     </div>
 
     <div class="field-group">
