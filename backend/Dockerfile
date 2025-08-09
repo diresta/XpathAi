@@ -63,7 +63,6 @@ WORKDIR /app
 COPY --from=builder /llama-server /app/llm/bin/llama-server
 
 COPY main.py /app/main.py
-COPY .env /app/.env
 COPY requirements.txt /app/requirements.txt
 
 RUN python3.12 -m pip install --upgrade pip --root-user-action=ignore && \
@@ -78,4 +77,6 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 EXPOSE 8000 8080
 
-CMD ["python3.12", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+HEALTHCHECK --interval=30s --timeout=3s --retries=5 CMD curl -fsS http://localhost:8000/health || exit 1
+
+CMD ["python3.12", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

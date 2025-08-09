@@ -3,9 +3,10 @@ import json
 import os
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 import logging
 from time import time
 from typing import Optional, List
@@ -51,17 +52,24 @@ class LlamaCppServer:
             if not os.path.exists(model_path):
                 raise ValueError(f"Model not found: {model_path}")
             
+            def get_cpu_params():
+                cpu_count = os.cpu_count() or 4
+                parallel = max(1, min(8, cpu_count // 2))
+                threads = min(16, cpu_count)
+                return parallel, threads
+
+            parallel, threads = get_cpu_params()
             cmd = [
                 self.binary_path,
                 "-m", model_path,
                 "--port", str(self.port),
                 "--host", "0.0.0.0",
                 "-c", str(settings.max_context_tokens),
-                "--parallel", "4",
-                "--threads", "8",
-                "--mlock"
+                "--parallel", str(parallel),
+                "--threads", str(threads),
             ]
-            
+            if settings.use_mlock:
+                cmd.append("--mlock")
             # Try to add GPU support if available
             try:
                 import subprocess
@@ -92,7 +100,6 @@ class LlamaCppServer:
                                 gpu_layers = str(settings.gpu_layers)
                         except Exception:
                             gpu_layers = str(settings.gpu_layers)
-                        
                         gpu_params = [
                             "-ngl", gpu_layers,     # GPU layers
                             "--main-gpu", "0"       # Use first GPU
@@ -108,16 +115,16 @@ class LlamaCppServer:
                 logging.debug(f"GPU detection failed, using CPU: {e}")
             
             # Advanced parameters (may not be supported by all models)
-            try:
-                advanced_params = [
-                    "--numa",  # NUMA systems
-                    "--batch-size", "512",
-                    "--ubatch-size", "512"
-                ]
-                cmd.extend(advanced_params)
-                logging.info("Added advanced llama.cpp parameters")
-            except Exception as e:
-                logging.warning(f"Advanced parameters failed: {e}")
+            if settings.enable_advanced_params:
+                try:
+                    advanced_params = [
+                        "--batch-size", "256",
+                        "--ubatch-size", "256"
+                    ]
+                    cmd.extend(advanced_params)
+                    logging.info("Added advanced llama.cpp parameters")
+                except Exception as e:
+                    logging.warning(f"Advanced parameters failed: {e}")
             
             if extra_args:
                 cmd.extend(extra_args)
@@ -329,13 +336,8 @@ class ModelManager:
         self.current_model = model_name
 
 class Settings(BaseSettings):
-    """
-    Application settings loaded from .env file.
-    The max_context_tokens setting is used to configure the context size for big DOM inputs.
-    Large values (e.g., 32768) may require >32GB RAM and slow down processing.
-    """
     models_dir: str = "/app/llm/models"
-    llamacpp_binary: str = "/app/llm/llama-server"
+    llamacpp_binary: str = "/app/llm/bin/llama-server"
     llamacpp_port: int = 8080
     default_model: str = "model.gguf"
     max_tokens: int = 2048
@@ -345,12 +347,30 @@ class Settings(BaseSettings):
     large_input_threshold: int = 20000
     max_context_tokens: int = 32768
     gpu_layers: int = 35
+    enable_advanced_params: bool = False
+    use_mlock: bool = False
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(env_prefix="XPATH_", case_sensitive=False)
 
 settings = Settings()
+
+def _log_effective_settings():
+    safe = {
+        "models_dir": settings.models_dir,
+        "llamacpp_binary": settings.llamacpp_binary,
+        "llamacpp_port": settings.llamacpp_port,
+        "default_model": settings.default_model,
+        "max_tokens": settings.max_tokens,
+        "temperature": settings.temperature,
+        "request_timeout": settings.request_timeout,
+        "generation_timeout": settings.generation_timeout,
+        "large_input_threshold": settings.large_input_threshold,
+        "max_context_tokens": settings.max_context_tokens,
+        "gpu_layers": settings.gpu_layers,
+        "enable_advanced_params": settings.enable_advanced_params,
+        "use_mlock": settings.use_mlock,
+    }
+    logging.info(f"Effective settings: {json.dumps(safe)}")
 
 # Initialize managers
 model_manager = ModelManager(settings.models_dir)
@@ -395,7 +415,7 @@ app = FastAPI(title="XPathAI Backend", description="AI-powered XPath generation 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["POST", "GET", "PUT"],
     allow_headers=["*"],
 )
@@ -404,6 +424,7 @@ app.add_middleware(
 async def startup_event():
     """Initialize with default model on startup."""
     try:
+        _log_effective_settings()
         available_models = model_manager.get_available_models()
         if available_models:
             default_model = settings.default_model if settings.default_model in available_models else available_models[0]
@@ -420,7 +441,7 @@ async def shutdown_event():
     """Cleanup on shutdown."""
     await llama_server.stop_server()
 
-async def call_llama(prompt: str, model: Optional[str] = None) -> str:
+async def call_llama(prompt: str, model: Optional[str] = None, *, max_tokens: Optional[int] = None, temperature: Optional[float] = None) -> str:
     """Generate text using llama.cpp server."""
     try:
         # Switch model if requested
@@ -428,11 +449,11 @@ async def call_llama(prompt: str, model: Optional[str] = None) -> str:
             logging.debug(f"Model switch requested: {llama_server.current_model} -> {model}")
             await llama_server.start_server(model)
             model_manager.set_current_model(model)
-            
+        
         response = await llama_server.generate(
             prompt=prompt,
-            max_tokens=settings.max_tokens,
-            temperature=settings.temperature,
+            max_tokens=max_tokens or settings.max_tokens,
+            temperature=temperature if temperature is not None else settings.temperature,
             timeout=settings.generation_timeout
         )
         return response
@@ -498,8 +519,12 @@ async def generate_xpath(data: AIRequest):
         if prompt_tokens_estimate > settings.max_context_tokens * 0.6:
             logging.warning(f"Large input ({prompt_tokens_estimate} tokens) may take longer to process")
         
-        response = await call_llama(prompt, model)
-        
+        response = await call_llama(
+            prompt,
+            model,
+            max_tokens=data.max_tokens or settings.max_tokens,
+            temperature=data.temperature if data.temperature is not None else settings.temperature,
+        )
         execution_time = time() - start
         
         # Log performance warning if too slow
@@ -534,6 +559,8 @@ async def generate_xpath(data: AIRequest):
             "performance_warning": execution_time > 30,
             "backend": "llama.cpp"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error(f"Unexpected error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -574,7 +601,13 @@ async def health_check():
     except Exception:
         pass
     
-    return {
+    if server_ready:
+        status_code = 200
+    elif server_healthy:
+        status_code = 503
+    else:
+        status_code = 500
+    payload = {
         "status": "ok",
         "server_status": server_status,
         "server_ready": server_ready,
@@ -586,3 +619,4 @@ async def health_check():
         "gpu_info": gpu_info,
         "acceleration": "GPU" if gpu_available else "CPU"
     }
+    return JSONResponse(payload, status_code=status_code)

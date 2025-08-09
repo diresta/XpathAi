@@ -13,7 +13,7 @@ app = FastAPI(title="XPathAI Backend - Ollama", description="AI-powered XPath ge
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
@@ -45,18 +45,18 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 logging.info(f"Ollama URL: {OLLAMA_BASE_URL}")
 
-async def call_ollama(prompt: str, model: str = "qwen2.5:3b") -> str:
+async def call_ollama(prompt: str, model: str = "qwen2.5:3b", *, max_tokens: int = 512, temperature: float = 0.3) -> str:
     async with httpx.AsyncClient(timeout=120.0) as client:
         payload = {
             "model": model,
             "prompt": prompt,
             "stream": False,
             "options": {
-                "temperature": 0.3,
+                "temperature": float(temperature),
                 "top_p": 0.8,
                 "top_k": 30,
                 "repeat_penalty": 1.3,
-                "num_predict": 512,
+                "num_predict": int(max_tokens),
                 "stop": ["</s>", "<|end|>", "\n\n\n"]
             }
         }
@@ -73,7 +73,6 @@ async def call_ollama(prompt: str, model: str = "qwen2.5:3b") -> str:
 @app.post("/generate-xpath")
 async def generate_xpath(data: AIRequest):
     start = time()
-    
     try:
         prompt_text = ""
         for msg in reversed(data.messages):
@@ -84,9 +83,8 @@ async def generate_xpath(data: AIRequest):
         if not prompt_text:
             raise HTTPException(status_code=400, detail="No user message found in request")
         
-        response = await call_ollama(prompt_text, data.model)
+        response = await call_ollama(prompt_text, data.model, max_tokens=data.max_tokens, temperature=data.temperature)
         execution_time = time() - start
-        
         return {
             "choices": [
                 {
@@ -108,6 +106,8 @@ async def generate_xpath(data: AIRequest):
             "backend": "ollama"
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error(f"Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -160,8 +160,7 @@ async def chat_completions(data: AIRequest):
         
         logging.info(f"Chat API request for model: {model}")
         
-        # Use call_ollama which uses the correct /api/generate endpoint
-        response_text = await call_ollama(prompt, model)
+        response_text = await call_ollama(prompt, model, max_tokens=data.max_tokens, temperature=data.temperature)
         execution_time = time() - start
         
         return {
@@ -185,6 +184,8 @@ async def chat_completions(data: AIRequest):
             "backend": "ollama"
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error(f"Chat API error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Chat API error: {str(e)}")
