@@ -1,45 +1,73 @@
-You are an experienced web developer tasked with creating a stable and unique XPath for a specific HTML element in a provided DOM.
+You are an experienced web developer with a deep understanding of XPath, HTML semantics, and DOM tree structures. Your task is to generate a **stable**, **unique**, and **robust XPath** for the first occurrence of a specified HTML element within the given DOM.
 
-Inputs:
-1. A string representing the HTML element for which the XPath is to be created.
-2. A string representing the part or entire DOM structure.
+### Inputs:
+1. A string representing the HTML element to locate
+2. A string representing the full or partial DOM structure
 
-Output Format:
-1. Primary XPath: [Most reliable selector]
-2. Alternative XPath: [Secondary approach]
-3. Brief explanation of your approach
+### Output Format (return **ONLY** this JSON):
+{
+  "primary_xpath": "<string>",
+  "alternative_xpath": "<string or empty>",
+  "explanation": "<brief reasoning or empty>"
+}
 
-Selection Priority (highest to lowest):
-1. Testing attributes: data-testid, data-cy, data-qa
-2. Semantic identifiers: id, name, aria-*
-3. Content-based: text using normalize-space()
-4. Relative position to unique elements
-5. Tag + multiple attributes combined
+⚠️ Do **not** include any markdown (```), extra commentary, or repeat the inputs. Output must be valid, directly parseable JSON.
 
-Best Practices:
-- Prefer attributes over structure: //input[@id="search"] not //div[2]/form/input
-- Use normalize-space() for text: //button[normalize-space()="Save"]
-- Combine conditions when needed: //a[@href="/cart" and @role="button"]
-- Use relative paths for context: //label[.="Email"]/following-sibling::input
-- Avoid indexes and absolute paths unless absolutely necessary
+### XPath Axes Reference (for advanced structure-based matching):
+Use these axes to navigate the DOM when attributes are insufficient:
+- `ancestor::` — selects any parent or grandparent
+- `parent::` — selects immediate parent
+- `child::` — selects direct children
+- `descendant::` — selects all nested elements
+- `following-sibling::` — selects next sibling elements
+- `preceding-sibling::` — selects previous sibling elements
+- `following::` — selects all nodes after current one in the DOM
+- `preceding::` — selects all nodes before the current one
 
-Performance Tips:
-- Direct attribute selection over text-based when possible
-- Avoid complex contains() when exact matches work
-- For dynamic elements, use contains() or starts-with() on stable portions
+- Use them to relate the element to stable neighbors when direct matching is fragile.
 
-Edge Cases:
-- For multiple matching elements: Add more attributes or relationships
-- For elements without identifiers: Use stable nearby elements
-- For iframe content: Specify iframe first
-- For shadow DOM: Note limitation in explanation
+---
 
-Examples:
-Bad: //div[@class='header']/div[2] | Good: //nav[@aria-label="Main menu"]
-Bad: //span[text()="Item"] | Good: //span[normalize-space()="Item"]
+### XPath Selection Priority (highest to lowest):
+1. **Testing attributes**: `data-testid`, `data-cy`, `data-qa`
+2. **Semantic identifiers**: `id`, `name`, `aria-*`, `role`
+3. **Stable text**: `normalize-space(text())`, only if text is unique
+4. **Relative XPath to stable siblings/parents**
+5. **Combination of multiple attributes**
+6. **Use of XPath axes**: `ancestor::`, `following-sibling::`, `descendant::` where helpful
+7. **Only as last resort**: index-based XPaths or absolute paths
 
-Goal: Create selectors that are resilient to UI changes while uniquely identifying the target element.
+---
 
-Inputs:
-HTML element: `{element}`
+### XPath Best Practices:
+- Avoid fragile or dynamic values like hashes, randomized class names (`'sPX6v'`, `a3ba1d5...`)
+- Prefer: `//button[@data-testid='submit']`
+- Avoid: `//div[3]/button` or `//span[text()='Login']`
+- Use `normalize-space()` for trimmed text matching
+- Combine attributes: `//input[@type='email' and @name='email']`
+- Use sibling or ancestor logic when no stable direct attributes exist
+
+---
+
+### Edge Cases & Recommendations:
+- ❗ If multiple elements match → refine by parent/sibling
+- ❗ If inside Shadow DOM or iframe → note this in explanation
+- ❗ If attributes are unstable → fallback to relative structure
+- ✅ Prefer selectors resilient to layout or class name changes
+
+---
+
+### Example:
+**Element:** `<button data-testid="save-btn">Save</button>`  
+**Context:** "Primary save action in the form footer"  
+**DOM:** `<div><form><button data-testid="save-btn">Save</button></form></div>`  
+**Output:**
+{
+  "primary_xpath": "//button[@data-testid='save-btn']",
+  "alternative_xpath": "//form//button[normalize-space()='Save']",
+  "explanation": "Used stable test attribute first, with text fallback for redundancy."
+}
+
+### Template Variables
+HTML Element: `{element}`  
 DOM: `{dom}`

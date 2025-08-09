@@ -27,6 +27,26 @@ services:
       - models_dir=/app/llm/models
       - llamacpp_binary=/app/llm/bin/llama-server
       - llamacpp_port=8080
+      - max_tokens=512
+      - generation_timeout=90
+      - request_timeout=300
+      - large_input_threshold=20000
+      - CUDA_VISIBLE_DEVICES=all
+    # GPU support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    mem_limit: 8g
+    memswap_limit: 8g
+    shm_size: 2g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
 
 networks:
   app_network:
